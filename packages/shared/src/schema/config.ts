@@ -11,4 +11,13 @@ export const AppConfigSchema = z.object({
     blocklist: z.array(z.string()).default([]),
 })
 
-// todo: default config
+export const DefaultConfig = AppConfigSchema.parse({
+    channel: "test",
+    maxMessages: 10,
+    disappear: true,
+    lifetimeMs: 30000,
+    fadeMs: 400,
+    showNames: true,
+    hideLinks: false,
+    blocklist: []
+})
