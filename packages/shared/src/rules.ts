@@ -9,8 +9,8 @@ export type Rule = {
   id: string;
   enabled: boolean;
 
-  match: any;
-  actions: any;
+  match: RuleMatch;
+  actions: RuleAction[];
 
   cooldownMs?: number;
 };

@@ -23,11 +23,6 @@ export const RuleMatchSchema = z.object({
 export const RuleActionSchema = z.discriminatedUnion("type", [
     z.object({ type: z.literal("addClass"), value: z.string().min(1) }),
     z.object({ type: z.literal("setVar"), name: z.string().min(1), value: z.string() }),
-    z.object({
-        type: z.literal("animate"),
-        classes: z.array(z.string().min(1)).min(1),
-        durationMs: z.number().int().min(0).max(60000).optional(),
-    }),
     z.object({ type: z.literal("suppress") }),
 ])
 

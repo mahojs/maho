@@ -29,4 +29,5 @@ Bun.serve({
 console.log(`server: http://localhost:${PORT}`);
 console.log(`health: http://localhost:${PORT}/health`);
 console.log(`overlay: http://localhost:${PORT}/overlay`);
+console.log(`control: http://localhost:${PORT}/control`);
 console.log(`dev: http://localhost:${PORT}/dev/state`);

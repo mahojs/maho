@@ -48,7 +48,7 @@ export function createRulesEngine(ruleset: Ruleset): RulesEngine {
             kind: r.match.kind,
             matchAll: r.match.matchAll ?? false,
             platform: r.match.platform,
-            userHasRole: r.match.useHasRole,
+            userHasRole: r.match.userHasRole,
             textIncludes: r.match.textIncludes,
             textRegex: r.match.textRegex ? safeRegex(r.match.textRegex) : undefined,
         },

@@ -1,5 +1,3 @@
-import { StringLike } from "bun";
-
 export type Platform = "twitch";
 export type UserRole = "broadcaster" | "mod" | "vip" | "sub" | "member";
 export type ChatUser = {
