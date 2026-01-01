@@ -1,1 +1,1 @@
-export const twitchHello = () => "twitch";
+export * from "./irc";

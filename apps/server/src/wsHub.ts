@@ -28,7 +28,10 @@ export type WsHub = {
 export function createWsHub(
   state: State,
   supportedProtocol: ProtocolVersion,
-  persist: () => Promise<void>
+  persist: () => Promise<void>,
+  hooks?: {
+    onConfigChanged?: (next: State["config"], prev: State["config"]) => void;
+  }
 ): WsHub {
   const clients = new Set<WS>();
   const roles = new WeakMap<WS, ClientRole>();
@@ -105,8 +108,11 @@ export function createWsHub(
         return;
       }
 
+      const prev = state.config;
       state.config = parsed.data;
+
       broadcast({ op: "config:changed", config: state.config });
+      hooks?.onConfigChanged?.(state.config, prev);
 
       persist().catch((e) => {
         send(ws, {

@@ -1,8 +1,9 @@
 import type { ProtocolVersion } from "@maho/shared";
-import { createInitialState } from "./state";
+import { createInitialState, evaluateEvent } from "./state";
 import { createWsHub } from "./wsHub";
 import { handleHttp } from "./routes";
 import { loadOrCreateStateFile, saveStateFile } from "./store";
+import { connectTwitchIrc } from "@maho/twitch";
 
 const PORT = Number(process.env.PORT ?? 3000);
 const SUPPORTED_PROTOCOL: ProtocolVersion = 1;
@@ -22,7 +23,27 @@ async function persistNow() {
   });
 }
 
-const hub = createWsHub(state, SUPPORTED_PROTOCOL, persistNow);
+const hub = createWsHub(state, SUPPORTED_PROTOCOL, persistNow, {
+  onConfigChanged(next, prev) {
+    if (next.channel !== prev.channel) startTwitch(next.channel);
+  },
+});
+
+let twitchConn: { close: () => void } | null = null;
+
+function startTwitch(channel: string) {
+  twitchConn?.close();
+  twitchConn = connectTwitchIrc({
+    channel,
+    onStatus: (s) => console.log(s),
+    onChatMessage: (ev) => {
+      const payload = evaluateEvent(state, ev);
+      hub.broadcast({ op: "event", payload });
+    },
+  });
+}
+
+startTwitch(state.config.channel);
 
 Bun.serve({
   port: PORT,

@@ -110,32 +110,78 @@ export function handleHttp(
   <meta charset="utf-8" />
   <title>maho control (dev)</title>
 </head>
-<body style="font-family:system-ui; padding:16px;">
+<body style="font-family:system-ui; padding:16px; max-width: 900px;">
   <h1>maho control (dev)</h1>
   <p>Overlay URL: <code>${"http://localhost:" + port + "/overlay"}</code></p>
 
-  <h2>Send fake chat</h2>
-  <label>Text <input id="text" value="pog" /></label>
-  <label>Platform
-    <select id="plat">
-      <option value="twitch">twitch</option>
-    </select>
-  </label>
-  <button id="send">Send</button>
+  <h2>WS</h2>
+  <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+    <label>
+      Channel:
+      <input id="channel" style="width:220px" value="${state.config.channel}" />
+    </label>
+    <button id="apply">Apply channel</button>
+    <span id="status" style="opacity:0.8;"></span>
+  </div>
 
-  <h2>WS log</h2>
-  <pre id="log" style="background:#111;color:#eee;padding:12px;border-radius:12px;max-width:900px;white-space:pre-wrap;"></pre>
+  <h2>Fake message</h2>
+  <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+    <label>Text <input id="text" value="pog" /></label>
+    <label>Platform
+      <select id="plat">
+        <option value="twitch">twitch</option>
+        <option value="youtube">youtube</option>
+      </select>
+    </label>
+    <button id="send">Send</button>
+  </div>
+
+  <h2>Log</h2>
+  <pre id="log" style="background:#111;color:#eee;padding:12px;border-radius:12px;white-space:pre-wrap;"></pre>
 
   <script>
     const log = document.getElementById("log");
+    const statusEl = document.getElementById("status");
+    const channelEl = document.getElementById("channel");
+
     function w(s){ log.textContent = s + "\\n" + log.textContent; }
+    function status(s){ statusEl.textContent = s; }
 
     const ws = new WebSocket("ws://" + location.host + "/ws");
+
     ws.addEventListener("open", () => {
       ws.send(JSON.stringify({ op: "hello", role: "control", protocolVersion: 1 }));
-      w("ws open");
+      status("ws connected");
     });
-    ws.addEventListener("message", (e) => w("ws " + e.data));
+
+    ws.addEventListener("close", () => status("ws closed"));
+    ws.addEventListener("error", () => status("ws error"));
+
+    ws.addEventListener("message", (e) => {
+      w("ws " + e.data);
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.op === "state" || msg.op === "config:changed") {
+          if (msg.config?.channel) channelEl.value = msg.config.channel;
+        }
+      } catch {}
+    });
+
+    document.getElementById("apply").onclick = () => {
+      const next = {
+        channel: channelEl.value.trim(),
+        maxMessages: ${state.config.maxMessages},
+        disappear: ${state.config.disappear},
+        lifetimeMs: ${state.config.lifetimeMs},
+        fadeMs: ${state.config.fadeMs},
+        showNames: ${state.config.showNames},
+        hideLinks: ${state.config.hideLinks},
+        blocklist: ${JSON.stringify(state.config.blocklist)}
+      };
+
+      ws.send(JSON.stringify({ op: "config:set", config: next }));
+      status("sent config:set");
+    };
 
     document.getElementById("send").onclick = async () => {
       const text = document.getElementById("text").value;

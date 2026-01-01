@@ -1,14 +1,12 @@
 # [0.2.0](https://github.com/mahojs/maho/compare/v0.1.0...v0.2.0) (2026-01-01)
 
-
 ### Bug Fixes
 
-* add missing control endpoint and fix types ([fcc6825](https://github.com/mahojs/maho/commit/fcc682513d4d35ffa28fb18ecf2f3aef78232b9b))
-
+- add missing control endpoint and fix types ([fcc6825](https://github.com/mahojs/maho/commit/fcc682513d4d35ffa28fb18ecf2f3aef78232b9b))
 
 ### Features
 
-* add state persistence and fix websocket typing ([9b4105b](https://github.com/mahojs/maho/commit/9b4105b24bc4b30e3a2231529e733ab62646f10f))
+- add state persistence and fix websocket typing ([9b4105b](https://github.com/mahojs/maho/commit/9b4105b24bc4b30e3a2231529e733ab62646f10f))
 
 # [1.1.0](https://github.com/mahojs/maho/compare/v1.0.0...v1.1.0) (2026-01-01)
 
