@@ -34,7 +34,7 @@ export type RulesChanged = {
 export type ServerState = {
     op: "state";
     config: AppConfig;
-    rules: RulesSet;
+    rules: Ruleset;
 }
 
 export type RuntimeEvent = {
