@@ -32,11 +32,14 @@ export const DEFAULT_PERSISTED_STATE: PersistedStateV1 = {
 };
 
 function parsePersistedStateV1(input: unknown): PersistedStateV1 {
-  if (!input || typeof input !== "object")
+  if (!input || typeof input !== "object") {
     throw new Error("state.json: expected object");
+  }
   const obj = input as any;
-  if (obj.version !== 1)
+
+  if (obj.version !== 1) {
     throw new Error(`state.json: unsupported version ${obj.version}`);
+  }
 
   const config = AppConfigSchema.parse(obj.config);
   const rules = RulesetSchema.parse(obj.rules);
@@ -68,9 +71,13 @@ export async function loadOrCreateStateFile(opts?: {
     const parsed = JSON.parse(raw);
     const state = parsePersistedStateV1(parsed);
     return { dataDir, filePath, state };
-  } catch {
-    await writeFile(filePath, JSON.stringify(defaults, null, 2), "utf8");
-    return { dataDir, filePath, state: defaults };
+  } catch (e: any) {
+    if (e && (e.code === "ENOENT" || e.code === "ENOTDIR")) {
+      await writeFile(filePath, JSON.stringify(defaults, null, 2), "utf8");
+      return { dataDir, filePath, state: defaults };
+    }
+
+    throw new Error(`failed to load ${filePath}: ${String(e)}`);
   }
 }
 

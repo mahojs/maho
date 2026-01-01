@@ -119,7 +119,6 @@ export function handleHttp(
   <label>Platform
     <select id="plat">
       <option value="twitch">twitch</option>
-      <option value="youtube">youtube</option>
     </select>
   </label>
   <button id="send">Send</button>
