@@ -5,54 +5,54 @@ import type { Ruleset } from "./rules";
 export type ProtocolVersion = 1;
 export type ClientRole = "overlay" | "control";
 export type ClientHello = {
-    op: "hello";
-    role: ClientRole;
-    protocolVersion: ProtocolVersion;
-    clientId?: string;
+  op: "hello";
+  role: ClientRole;
+  protocolVersion: ProtocolVersion;
+  clientId?: string;
 };
 
 export type ConfigSet = {
-    op: "config:set";
-    config: AppConfig;
+  op: "config:set";
+  config: AppConfig;
 };
 
 export type ConfigChanged = {
-    op: "config:changed";
-    config: AppConfig
-}
+  op: "config:changed";
+  config: AppConfig;
+};
 
 export type RulesSet = {
-    op: "rules:set";
-    rules: Ruleset
-}
+  op: "rules:set";
+  rules: Ruleset;
+};
 
 export type RulesChanged = {
-    op: "rules:changed";
-    rules: Ruleset
-}
+  op: "rules:changed";
+  rules: Ruleset;
+};
 
 export type ServerState = {
-    op: "state";
-    config: AppConfig;
-    rules: Ruleset;
-}
+  op: "state";
+  config: AppConfig;
+  rules: Ruleset;
+};
 
 export type RuntimeEvent = {
-    op: "event";
-    payload: EvaluatedEvent;
-}
+  op: "event";
+  payload: EvaluatedEvent;
+};
 
 export type ProtocolError = {
-    op: "error";
-    message: string;
-    details?: unknown;
+  op: "error";
+  message: string;
+  details?: unknown;
 };
 
 export type ServerToClient =
-    | ServerState
-    | ConfigChanged
-    | RulesChanged
-    | RuntimeEvent
-    | ProtocolError;
+  | ServerState
+  | ConfigChanged
+  | RulesChanged
+  | RuntimeEvent
+  | ProtocolError;
 
 export type ClientToServer = ClientHello | ConfigSet | RulesSet;

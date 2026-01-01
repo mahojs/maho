@@ -1,7 +1,10 @@
 {
   "name": "maho",
   "private": true,
-  "workspaces": ["apps/*", "packages/*"],
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev": "bun --filter '*' dev",
     "build": "bun --filter '*' build",
