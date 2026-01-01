@@ -10,46 +10,57 @@ import {
   setRuleset,
   type State,
 } from "./state";
-import { ServerWebSocket } from "bun";
+import type { ServerWebSocket } from "bun";
+
+type WsData = {};
+type WS = ServerWebSocket<WsData>;
 
 export type WsHub = {
-  clients: Set<ServerWebSocket<unknown>>;
-  roles: WeakMap<ServerWebSocket<unknown>, ClientRole>;
+  clients: Set<WS>;
+  roles: WeakMap<WS, ClientRole>;
   broadcast: (msg: ServerToClient) => void;
-  send: (ws: ServerWebSocket<unknown>, msg: ServerToClient) => void;
-  onMessage: (ws: ServerWebSocket<unknown>, raw: unknown) => void;
-  onOpen: (ws: ServerWebSocket<unknown>) => void;
-  onClose: (ws: ServerWebSocket<unknown>) => void;
+  send: (ws: WS, msg: ServerToClient) => void;
+  onMessage: (ws: WS, raw: unknown) => void;
+  onOpen: (ws: WS) => void;
+  onClose: (ws: WS) => void;
 };
 
 export function createWsHub(
   state: State,
-  supportedProtocol: ProtocolVersion
+  supportedProtocol: ProtocolVersion,
+  persist: () => Promise<void>
 ): WsHub {
-  const clients = new Set<ServerWebSocket<unknown>>();
-  const roles = new WeakMap<ServerWebSocket<unknown>, ClientRole>();
-  function send(ws: ServerWebSocket<unknown>, msg: ServerToClient) {
+  const clients = new Set<WS>();
+  const roles = new WeakMap<WS, ClientRole>();
+
+  function send(ws: WS, msg: ServerToClient) {
     ws.send(JSON.stringify(msg));
   }
+
   function broadcast(msg: ServerToClient) {
     const s = JSON.stringify(msg);
     for (const ws of clients) ws.send(s);
   }
-  function requireHello(ws: ServerWebSocket<unknown>): boolean {
+
+  function requireHello(ws: WS): boolean {
     return typeof roles.get(ws) !== "undefined";
   }
-  function requireControl(ws: ServerWebSocket<unknown>): boolean {
+
+  function requireControl(ws: WS): boolean {
     return roles.get(ws) === "control";
   }
-  function onOpen(ws: ServerWebSocket<unknown>) {
+
+  function onOpen(ws: WS) {
     clients.add(ws);
     send(ws, { op: "state", config: state.config, rules: state.ruleset });
   }
-  function onClose(ws: ServerWebSocket<unknown>) {
+
+  function onClose(ws: WS) {
     clients.delete(ws);
     roles.delete(ws);
   }
-  function onMessage(ws: ServerWebSocket<unknown>, raw: unknown) {
+
+  function onMessage(ws: WS, raw: unknown) {
     let msg: ClientToServer;
     try {
       msg = JSON.parse(String(raw));
@@ -62,7 +73,7 @@ export function createWsHub(
       if (msg.protocolVersion !== supportedProtocol) {
         send(ws, {
           op: "error",
-          message: `unsupported protocolVersion ${msg.protocolVersion}, server supports ${supportedProtocol}`,
+          message: `unsupported protocolVersion ${msg.protocolVersion}; server supports ${supportedProtocol}`,
         });
         return;
       }
@@ -83,6 +94,7 @@ export function createWsHub(
         });
         return;
       }
+
       const parsed = validateConfig(msg.config);
       if (!parsed.success) {
         send(ws, {
@@ -92,8 +104,18 @@ export function createWsHub(
         });
         return;
       }
+
       state.config = parsed.data;
       broadcast({ op: "config:changed", config: state.config });
+
+      persist().catch((e) => {
+        send(ws, {
+          op: "error",
+          message: "failed to persist config",
+          details: String(e),
+        });
+      });
+
       return;
     }
 
@@ -101,24 +123,37 @@ export function createWsHub(
       if (!requireControl(ws)) {
         send(ws, {
           op: "error",
-          message: "only control clients can set config",
+          message: "only control clients can set rules",
         });
         return;
       }
+
       const parsed = validateRuleset(msg.rules);
       if (!parsed.success) {
         send(ws, {
           op: "error",
-          message: "invalid config",
+          message: "invalid ruleset",
           details: { issues: parsed.error.issues },
         });
         return;
       }
+
       setRuleset(state, parsed.data);
       broadcast({ op: "rules:changed", rules: state.ruleset });
+
+      persist().catch((e) => {
+        send(ws, {
+          op: "error",
+          message: "failed to persist rules",
+          details: String(e),
+        });
+      });
+
       return;
     }
+
     send(ws, { op: "error", message: "unknown op" });
   }
+
   return { clients, roles, broadcast, send, onMessage, onOpen, onClose };
 }
