@@ -1,0 +1,16 @@
+{
+  "name": "@maho/server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/main.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@maho/shared": "workspace:*",
+    "@maho/rules": "workspace:*",
+    "@maho/twitch": "workspace:*"
+  }
+}

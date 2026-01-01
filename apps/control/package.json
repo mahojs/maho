@@ -1,0 +1,15 @@
+{
+  "name": "@maho/control",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "echo TODO",
+    "build": "echo TODO",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@maho/shared": "workspace:*"
+  }
+}

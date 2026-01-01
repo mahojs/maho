@@ -1,0 +1,14 @@
+{
+  "name": "@maho/twitch",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@maho/shared": "workspace:*"
+  }
+}
