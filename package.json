@@ -7,7 +7,8 @@
     "build": "bun --filter '*' build",
     "typecheck": "bun --filter '*' typecheck",
     "lint": "bun --filter '*' lint",
-    "test": "bun --filter '*' test"
+    "test": "bun --filter '*' test",
+    "release": "semantic-release"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
