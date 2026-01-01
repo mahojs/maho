@@ -23,12 +23,12 @@ export type ConfigChanged = {
 
 export type RulesSet = {
     op: "rules:set";
-    config: AppConfig
+    rules: Ruleset
 }
 
 export type RulesChanged = {
     op: "rules:changed";
-    config: AppConfig
+    rules: Ruleset
 }
 
 export type ServerState = {
