@@ -1,4 +1,4 @@
-import type { ChatMessageEvent, UserRole } from "@maho/shared";
+import type { ChatMessageEvent, MessagePart, UserRole } from "@maho/shared";
 
 const TWITCH_IRC_WS = "wss://irc-ws.chat.twitch.tv:443";
 
@@ -36,6 +36,61 @@ function rolesFromTags(
   if (badges.split(",").some((b) => b.startsWith("subscriber/")))
     roles.push("sub");
   return [...new Set(roles)];
+}
+
+function parseMessageParts(
+  text: string,
+  emotesTag: string | undefined
+): MessagePart[] {
+  if (!emotesTag) {
+    return [{ type: "text", content: text }];
+  }
+
+  type EmoteRange = { id: string; start: number; end: number };
+  const ranges: EmoteRange[] = [];
+
+  const groups = emotesTag.split("/");
+  for (const group of groups) {
+    const [id, positions] = group.split(":");
+    if (!id || !positions) continue;
+
+    for (const pos of positions.split(",")) {
+      const [start, end] = pos.split("-");
+      ranges.push({ id, start: Number(start), end: Number(end) });
+    }
+  }
+
+  ranges.sort((a, b) => a.start - b.start);
+
+  const parts: MessagePart[] = [];
+  let cursor = 0;
+
+  for (const r of ranges) {
+    if (r.start > cursor) {
+      parts.push({
+        type: "text",
+        content: text.substring(cursor, r.start),
+      });
+    }
+
+    const name = text.substring(r.start, r.end + 1);
+    parts.push({
+      type: "emote",
+      id: r.id,
+      name,
+    });
+
+    cursor = r.end + 1;
+  }
+
+  if (cursor < text.length) {
+    parts.push({
+      type: "text",
+      content: text.substring(cursor),
+    });
+  }
+
+  return parts;
 }
 
 export function connectTwitchIrc(opts: TwitchIrcOptions): {
@@ -92,6 +147,7 @@ export function connectTwitchIrc(opts: TwitchIrcOptions): {
         const displayName = tags.get("display-name") || userLogin;
 
         const roles = rolesFromTags(tags, chan, userLogin);
+        const parts = parseMessageParts(text, tags.get("emotes"));
 
         const msgEvent: ChatMessageEvent = {
           kind: "chat.message",
@@ -107,6 +163,7 @@ export function connectTwitchIrc(opts: TwitchIrcOptions): {
             roles,
           },
           text,
+          parts,
           provider: {
             twitch: {
               tags: Object.fromEntries(tags.entries()),
