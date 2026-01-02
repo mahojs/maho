@@ -103,9 +103,15 @@
       </div>
 
       <div class="row">
-        <label class="checkbox"><input type="checkbox" id="disappear" /> Disappear</label>
-        <label class="checkbox"><input type="checkbox" id="showNames" /> Show Names</label>
-        <label class="checkbox"><input type="checkbox" id="hideLinks" /> Hide Links</label>
+        <label class="checkbox"
+          ><input type="checkbox" id="disappear" /> Disappear</label
+        >
+        <label class="checkbox"
+          ><input type="checkbox" id="showNames" /> Show names</label
+        >
+        <label class="checkbox"
+          ><input type="checkbox" id="hideLinks" /> Hide links</label
+        >
       </div>
 
       <label>
@@ -189,9 +195,12 @@
           ...currentConfig,
           channel: els.channel.value.trim(),
           seventvUserId: els.seventv.value.trim() || undefined,
-          maxMessages: Number(els.maxMessages.value),
-          lifetimeMs: Number(els.lifetimeMs.value),
-          fadeMs: Number(els.fadeMs.value),
+          maxMessages: readNumberInput(
+            els.maxMessages,
+            currentConfig.maxMessages
+          ),
+          lifetimeMs: readNumberInput(els.lifetimeMs, currentConfig.lifetimeMs),
+          fadeMs: readNumberInput(els.fadeMs, currentConfig.fadeMs),
           disappear: els.disappear.checked,
           showNames: els.showNames.checked,
           hideLinks: els.hideLinks.checked,
@@ -200,6 +209,13 @@
             .map((s) => s.trim())
             .filter(Boolean),
         };
+      }
+
+      function readNumberInput(el, fallback) {
+        const raw = (el.value ?? "").trim();
+        if (raw === "") return fallback;
+        const n = Number(raw);
+        return Number.isFinite(n) ? n : fallback;
       }
 
       const wsProto = location.protocol === "https:" ? "wss:" : "ws:";
