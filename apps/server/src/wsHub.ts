@@ -55,7 +55,6 @@ export function createWsHub(
 
   function onOpen(ws: WS) {
     clients.add(ws);
-    send(ws, { op: "state", config: state.config, rules: state.ruleset });
   }
 
   function onClose(ws: WS) {
@@ -81,6 +80,7 @@ export function createWsHub(
         return;
       }
       roles.set(ws, msg.role);
+      send(ws, { op: "state", config: state.config, rules: state.ruleset });
       return;
     }
 
