@@ -36,14 +36,8 @@ export function createWsHub(
   const clients = new Set<WS>();
   const roles = new WeakMap<WS, ClientRole>();
 
-  function send(ws: WS, msg: ServerToClient) {
-    ws.send(JSON.stringify(msg));
-  }
-
-  function broadcast(msg: ServerToClient) {
-    const s = JSON.stringify(msg);
-    for (const ws of clients) ws.send(s);
-  }
+  let configCommitToken = 0;
+  let rulesCommitToken = 0;
 
   function requireHello(ws: WS): boolean {
     return typeof roles.get(ws) !== "undefined";
@@ -51,6 +45,31 @@ export function createWsHub(
 
   function requireControl(ws: WS): boolean {
     return roles.get(ws) === "control";
+  }
+
+  function encode(msg: ServerToClient): string {
+    return JSON.stringify(msg);
+  }
+
+  function send(ws: WS, msg: ServerToClient) {
+    ws.send(encode(msg));
+  }
+
+  function broadcast(msg: ServerToClient) {
+    const s = encode(msg);
+    for (const ws of clients) {
+      if (!requireHello(ws)) continue;
+      ws.send(s);
+    }
+  }
+
+  function broadcastToControl(msg: ServerToClient, except?: WS) {
+    const s = encode(msg);
+    for (const ws of clients) {
+      if (ws === except) continue;
+      if (!requireHello(ws)) continue;
+      if (roles.get(ws) === "control") ws.send(s);
+    }
   }
 
   function onOpen(ws: WS) {
@@ -68,6 +87,7 @@ export function createWsHub(
       msg = JSON.parse(String(raw));
     } catch {
       send(ws, { op: "error", message: "invalid JSON" });
+      ws.close(1002, "invalid JSON");
       return;
     }
 
@@ -94,6 +114,7 @@ export function createWsHub(
 
     if (!requireHello(ws)) {
       send(ws, { op: "error", message: "hello required" });
+      ws.close(1002, "hello required");
       return;
     }
 
@@ -116,19 +137,34 @@ export function createWsHub(
         return;
       }
 
+      const token = ++configCommitToken;
       const prev = state.config;
-      state.config = parsed.data;
+      const next = parsed.data;
 
-      broadcast({ op: "config:changed", config: state.config });
-      hooks?.onConfigChanged?.(state.config, prev);
+      state.config = next;
 
-      persist().catch((e) => {
-        send(ws, {
-          op: "error",
-          message: "failed to persist config",
-          details: String(e),
-        });
-      });
+      (async () => {
+        try {
+          await persist();
+        } catch (e) {
+          state.config = prev;
+
+          const errMsg = {
+            op: "error",
+            message: "failed to persist config; change was not applied",
+            details: String(e),
+          } as const;
+
+          send(ws, errMsg);
+          broadcastToControl(errMsg, ws);
+          return;
+        }
+
+        if (token !== configCommitToken) return;
+
+        broadcast({ op: "config:changed", config: state.config });
+        hooks?.onConfigChanged?.(state.config, prev);
+      })();
 
       return;
     }
@@ -152,16 +188,33 @@ export function createWsHub(
         return;
       }
 
-      setRuleset(state, parsed.data);
-      broadcast({ op: "rules:changed", rules: state.ruleset });
+      const token = ++rulesCommitToken;
+      const prev = state.ruleset;
+      const next = parsed.data;
 
-      persist().catch((e) => {
-        send(ws, {
-          op: "error",
-          message: "failed to persist rules",
-          details: String(e),
-        });
-      });
+      setRuleset(state, next);
+
+      (async () => {
+        try {
+          await persist();
+        } catch (e) {
+          setRuleset(state, prev);
+
+          const errMsg = {
+            op: "error",
+            message: "failed to persist rules; change was not applied",
+            details: String(e),
+          } as const;
+
+          send(ws, errMsg);
+          broadcastToControl(errMsg, ws);
+          return;
+        }
+
+        if (token !== rulesCommitToken) return;
+
+        broadcast({ op: "rules:changed", rules: state.ruleset });
+      })();
 
       return;
     }
