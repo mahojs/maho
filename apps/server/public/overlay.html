@@ -120,10 +120,16 @@
         if (part.type === "text") return document.createTextNode(part.content);
         if (part.type === "emote") {
           const img = document.createElement("img");
-          img.src =
-            "https://static-cdn.jtvnw.net/emoticons/v2/" +
-            part.id +
-            "/default/dark/1.0";
+
+          if (part.url) {
+            img.src = part.url;
+          } else {
+            img.src =
+              "https://static-cdn.jtvnw.net/emoticons/v2/" +
+              part.id +
+              "/default/dark/1.0";
+          }
+
           img.className = "part-emote";
           img.alt = part.name;
           return img;
