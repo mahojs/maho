@@ -72,13 +72,21 @@ export function createWsHub(
     }
 
     if (msg.op === "hello") {
+      if (requireHello(ws)) {
+        send(ws, { op: "error", message: "hello already received" });
+        ws.close(1002, "duplicate hello");
+        return;
+      }
+
       if (msg.protocolVersion !== supportedProtocol) {
         send(ws, {
           op: "error",
           message: `unsupported protocolVersion ${msg.protocolVersion}; server supports ${supportedProtocol}`,
         });
+        ws.close(1002, "unsupported protocol");
         return;
       }
+
       roles.set(ws, msg.role);
       send(ws, { op: "state", config: state.config, rules: state.ruleset });
       return;
