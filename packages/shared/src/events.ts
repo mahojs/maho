@@ -1,9 +1,9 @@
-export type Platform = "twitch"; // Prepared for future
+export type Platform = "twitch";
 export type UserRole = "broadcaster" | "mod" | "vip" | "sub" | "member";
 
 export type MessagePart =
   | { type: "text"; content: string }
-  | { type: "emote"; id: string; name: string } // name is "Kappa"
+  | { type: "emote"; id: string; name: string; url?: string }
   | { type: "mention"; user: string }
   | { type: "link"; url: string; text: string };
 
@@ -24,12 +24,8 @@ export type ChatMessageEvent = {
   channelName?: string;
   user: ChatUser;
   
-  /** Raw text for Rules Engine regex matching */
   text: string;
-  
-  /** Tokenized text for Frontend rendering (emotes, links) */
   parts: MessagePart[]; 
-
   provider?: Record<string, unknown>;
 };
 

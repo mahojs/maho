@@ -5,7 +5,6 @@ export const RuleMatchSchema = z
   .object({
     kind: z.literal("chat.message"),
     matchAll: z.boolean().optional(),
-    // These must be optional to allow "Partial" matching rules
     platform: PlatformSchema.optional(), 
     userHasRole: UserRoleSchema.optional(),
     textIncludes: z.string().min(1).optional(),
@@ -14,7 +13,6 @@ export const RuleMatchSchema = z
   .refine(
     (m) => {
       if (m.matchAll) return true;
-      // Ensure at least one filter is active if matchAll is false
       return !!(m.platform || m.userHasRole || m.textIncludes || m.textRegex);
     },
     {
