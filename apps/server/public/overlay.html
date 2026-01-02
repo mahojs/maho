@@ -70,7 +70,8 @@
     <div id="wrap"></div>
     <script>
       const wrap = document.getElementById("wrap");
-      const ws = new WebSocket("ws://" + location.host + "/ws");
+      const wsProto = location.protocol === "https:" ? "wss:" : "ws:";
+      const ws = new WebSocket(`${wsProto}//${location.host}/ws`);
 
       let config = {
         maxMessages: 10,
