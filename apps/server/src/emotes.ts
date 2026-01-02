@@ -23,27 +23,31 @@ type SevenTVEmote = {
 };
 
 type SevenTVSet = { emotes: SevenTVEmote[] };
+type SevenTVUser = { emote_set?: { id: string }; username: string };
 
 function extract7TVEmotes(emotes: SevenTVEmote[], map: EmoteMap) {
   for (const e of emotes) {
     const host = e.data.host;
     if (!host.files || !host.files.length) continue;
-
     const file =
       host.files.find((f) => f.format === "WEBP" && f.name === "2x.webp") ||
       host.files.find((f) => f.format === "WEBP") ||
       host.files[0];
 
     if (!file) continue;
-
     const baseUrl = host.url.startsWith("//") ? `https:${host.url}` : host.url;
-    const url = `${baseUrl}/${file.name}`;
-    map.set(e.name, url);
+    map.set(e.name, `${baseUrl}/${file.name}`);
   }
 }
 
+async function resolveUserSetId(userId: string): Promise<string | null> {
+  const user = await fetchJson<SevenTVUser>(`${SEVENTV_API}/users/${userId}`);
+  if (user?.emote_set?.id) return user.emote_set.id;
+  return null;
+}
+
 export async function loadEmotes(config: {
-  seventvEmoteSetId?: string;
+  seventvUserId?: string;
 }): Promise<EmoteMap> {
   const map: EmoteMap = new Map();
 
@@ -55,14 +59,21 @@ export async function loadEmotes(config: {
     console.log(`[emotes] loaded ${globalData.emotes.length} global emotes`);
   }
 
-  if (config.seventvEmoteSetId) {
-    const setData = await fetchJson<SevenTVSet>(
-      `${SEVENTV_API}/emote-sets/${config.seventvEmoteSetId}`
-    );
-    if (setData?.emotes) {
-      extract7TVEmotes(setData.emotes, map);
-      console.log(
-        `[emotes] loaded ${setData.emotes.length} set emotes (${config.seventvEmoteSetId})`
+  if (config.seventvUserId) {
+    const setId = await resolveUserSetId(config.seventvUserId);
+    if (setId) {
+      const setData = await fetchJson<SevenTVSet>(
+        `${SEVENTV_API}/emote-sets/${setId}`
+      );
+      if (setData?.emotes) {
+        extract7TVEmotes(setData.emotes, map);
+        console.log(
+          `[emotes] loaded ${setData.emotes.length} emotes for user ${config.seventvUserId} (set: ${setId})`
+        );
+      }
+    } else {
+      console.warn(
+        `[emotes] could not resolve emote set for 7TV user ${config.seventvUserId}`
       );
     }
   }

@@ -29,12 +29,12 @@ async function persistNow() {
 const hub = createWsHub(state, SUPPORTED_PROTOCOL, persistNow, {
   onConfigChanged(next, prev) {
     if (next.channel !== prev.channel) startTwitch(next.channel);
-
-    if (next.seventvEmoteSetId !== prev.seventvEmoteSetId) {
-      console.log("config changed, reloading emotes...");
-      loadEmotes(next).then((map) => {
-        state.emoteMap = map;
-      });
+    
+    if (next.seventvUserId !== prev.seventvUserId) {
+        console.log("Config changed, reloading emotes...");
+        loadEmotes(next).then(map => {
+            state.emoteMap = map;
+        });
     }
   },
 });

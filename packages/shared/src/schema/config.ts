@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const AppConfigSchema = z.object({
   channel: z.string().min(1),
-  seventvEmoteSetId: z.string().optional(),
+  seventvUserId: z.string().optional(),
   maxMessages: z.number().int().min(1).max(50),
   disappear: z.boolean(),
   lifetimeMs: z.number().int().min(1000).max(300000),
@@ -14,7 +14,7 @@ export const AppConfigSchema = z.object({
 
 export const DefaultConfig = AppConfigSchema.parse({
   channel: "test",
-  seventvEmoteSetId: "",
+  seventvUserId: "",
   maxMessages: 10,
   disappear: true,
   lifetimeMs: 30000,

@@ -172,7 +172,7 @@
 
       function syncUI(c) {
         els.channel.value = c.channel ?? "";
-        els.seventv.value = c.seventvEmoteSetId ?? "";
+        els.seventv.value = c.seventvUserId ?? "";
         els.maxMessages.value = c.maxMessages ?? "";
         els.lifetimeMs.value = c.lifetimeMs ?? "";
         els.fadeMs.value = c.fadeMs ?? "";
@@ -188,7 +188,7 @@
         return {
           ...currentConfig,
           channel: els.channel.value.trim(),
-          seventvEmoteSetId: els.seventv.value.trim() || undefined,
+          seventvUserId: els.seventv.value.trim() || undefined,
           maxMessages: Number(els.maxMessages.value),
           lifetimeMs: Number(els.lifetimeMs.value),
           fadeMs: Number(els.fadeMs.value),
