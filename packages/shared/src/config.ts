@@ -1,5 +1,6 @@
 export type AppConfig = {
   channel: string;
+  seventvEmoteSetId?: string;
   maxMessages: number;
   disappear: boolean;
   lifetimeMs: number;

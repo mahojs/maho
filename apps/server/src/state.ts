@@ -8,11 +8,13 @@ import {
   type Ruleset,
 } from "@maho/shared";
 import { createRulesEngine, type RulesEngine } from "@maho/rules";
+import { EmoteMap, enrichMessageParts } from "./emotes";
 
 export type State = {
   config: AppConfig;
   ruleset: Ruleset;
   engine: RulesEngine;
+  emoteMap: EmoteMap;
 };
 
 export function createInitialState(seed?: {
@@ -43,6 +45,7 @@ export function createInitialState(seed?: {
     config,
     ruleset,
     engine: createRulesEngine(ruleset),
+    emoteMap: new Map(),
   };
 }
 
@@ -84,6 +87,14 @@ export function evaluateEvent(state: State, ev: AppEvent): EvaluatedEvent {
         return { event: next, actions: [{ type: "suppress" }] };
       }
       const actions = state.engine.evaluate(next, Date.now());
+
+      if (next.parts) {
+        next = {
+          ...next,
+          parts: enrichMessageParts(next.parts, state.emoteMap),
+        };
+      }
+
       return { event: next, actions };
     }
     default:

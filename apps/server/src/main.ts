@@ -3,6 +3,7 @@ import { createInitialState, evaluateEvent } from "./state";
 import { createWsHub } from "./wsHub";
 import { handleHttp } from "./routes";
 import { loadOrCreateStateFile, saveStateFile } from "./store";
+import { loadEmotes } from "./emotes";
 import { connectTwitchIrc } from "@maho/twitch";
 
 const PORT = Number(process.env.PORT ?? 3000);
@@ -15,6 +16,8 @@ const state = createInitialState({
   ruleset: persisted.rules,
 });
 
+state.emoteMap = await loadEmotes(state.config);
+
 async function persistNow() {
   await saveStateFile(filePath, {
     version: 1,
@@ -26,6 +29,13 @@ async function persistNow() {
 const hub = createWsHub(state, SUPPORTED_PROTOCOL, persistNow, {
   onConfigChanged(next, prev) {
     if (next.channel !== prev.channel) startTwitch(next.channel);
+
+    if (next.seventvEmoteSetId !== prev.seventvEmoteSetId) {
+      console.log("config changed, reloading emotes...");
+      loadEmotes(next).then((map) => {
+        state.emoteMap = map;
+      });
+    }
   },
 });
 
