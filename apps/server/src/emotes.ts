@@ -133,8 +133,13 @@ export function enrichMessageParts(
     for (const token of tokens) {
       if (!token) continue;
 
+      if (/^\s+$/.test(token)) {
+        out.push({ type: "text", content: token });
+        continue;
+      }
+
       const url = map.get(token);
-      if (url && token.trim().length > 0) {
+      if (url) {
         out.push({
           type: "emote",
           id: "7tv-" + token,
