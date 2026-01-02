@@ -16,6 +16,8 @@ const state = createInitialState({
   ruleset: persisted.rules,
 });
 
+let emoteLoadToken = 0;
+
 state.emoteMap = await loadEmotes(state.config);
 
 async function persistNow() {
@@ -29,11 +31,19 @@ async function persistNow() {
 const hub = createWsHub(state, SUPPORTED_PROTOCOL, persistNow, {
   onConfigChanged(next, prev) {
     if (next.channel !== prev.channel) startTwitch(next.channel);
-    
+
     if (next.seventvUserId !== prev.seventvUserId) {
-        console.log("Config changed, reloading emotes...");
-        loadEmotes(next).then(map => {
-            state.emoteMap = map;
+      console.log("Config changed, reloading emotes...");
+      const token = ++emoteLoadToken;
+
+      loadEmotes(next)
+        .then((map) => {
+          if (token !== emoteLoadToken) return;
+          state.emoteMap = map;
+        })
+        .catch((e) => {
+          if (token !== emoteLoadToken) return;
+          console.error("[emotes] reload failed:", e);
         });
     }
   },
