@@ -1,0 +1,190 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>maho overlay</title>
+    <style>
+      body {
+        margin: 0;
+        background: transparent;
+        color: #fff;
+        font-family: system-ui;
+        overflow: hidden;
+      }
+      #wrap {
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        height: 100vh;
+        box-sizing: border-box;
+      }
+      .msg {
+        margin: 4px 0;
+        padding: 8px 10px;
+        background: rgba(0, 0, 0, 0.6);
+        border-radius: 8px;
+        width: fit-content;
+        font-size: 16px;
+        line-height: 1.4;
+        opacity: 0;
+        transform: translateY(10px);
+        transition:
+          opacity 0.4s ease,
+          transform 0.4s ease;
+        animation: enter 0.4s forwards;
+      }
+      @keyframes enter {
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .msg.exiting {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      .suppressed {
+        opacity: 0.5;
+        text-decoration: line-through;
+      }
+
+      .part-emote {
+        height: 1.2em;
+        vertical-align: middle;
+        margin: 0 2px;
+      }
+      .part-mention {
+        font-weight: bold;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+        padding: 0 4px;
+      }
+      .part-link {
+        color: #aaa;
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="wrap"></div>
+    <script>
+      const wrap = document.getElementById("wrap");
+      const ws = new WebSocket("ws://" + location.host + "/ws");
+
+      let config = {
+        maxMessages: 10,
+        lifetimeMs: 10000,
+        fadeMs: 400,
+        disappear: true,
+        showNames: true,
+      };
+
+      class Queue {
+        constructor() {
+          this.items = [];
+        }
+
+        add(el) {
+          wrap.appendChild(el);
+          this.items.push({ el, ts: Date.now() });
+          this.prune();
+          this.scheduleExpiry(el);
+        }
+
+        prune() {
+          while (this.items.length > config.maxMessages) {
+            const item = this.items.shift();
+            this.remove(item.el);
+          }
+        }
+
+        scheduleExpiry(el) {
+          if (!config.disappear) return;
+          setTimeout(() => {
+            if (document.body.contains(el)) this.remove(el);
+          }, config.lifetimeMs);
+        }
+
+        remove(el) {
+          if (el.classList.contains("exiting")) return;
+          el.classList.add("exiting");
+          el.style.transitionDuration = config.fadeMs + "ms";
+          setTimeout(() => el.remove(), config.fadeMs);
+        }
+      }
+
+      const queue = new Queue();
+
+      function renderPart(part) {
+        if (part.type === "text") return document.createTextNode(part.content);
+        if (part.type === "emote") {
+          const img = document.createElement("img");
+          img.src =
+            "https://static-cdn.jtvnw.net/emoticons/v2/" +
+            part.id +
+            "/default/dark/1.0";
+          img.className = "part-emote";
+          img.alt = part.name;
+          return img;
+        }
+        if (part.type === "mention") {
+          const span = document.createElement("span");
+          span.className = "part-mention";
+          span.textContent = "@" + part.user;
+          return span;
+        }
+        if (part.type === "link") {
+          const a = document.createElement("span");
+          a.className = "part-link";
+          a.textContent = "[link]";
+          return a;
+        }
+        return document.createTextNode("");
+      }
+
+      ws.addEventListener("open", () => {
+        ws.send(
+          JSON.stringify({ op: "hello", role: "overlay", protocolVersion: 1 })
+        );
+      });
+
+      ws.addEventListener("message", (e) => {
+        const msg = JSON.parse(e.data);
+
+        if (msg.op === "state" || msg.op === "config:changed") {
+          if (msg.config) {
+            config = { ...config, ...msg.config };
+            queue.prune();
+          }
+        }
+
+        if (msg.op === "event") {
+          const payload = msg.payload;
+          const div = document.createElement("div");
+          div.className = "msg";
+
+          const isSuppressed = (payload.actions || []).some(
+            (a) => a.type === "suppress"
+          );
+          if (isSuppressed) div.classList.add("suppressed");
+
+          if (config.showNames) {
+            const b = document.createElement("b");
+            b.textContent = payload.event.user.displayName + ": ";
+            b.style.color = payload.event.user.color || "#a970ff";
+            div.appendChild(b);
+          }
+
+          if (payload.event.parts) {
+            payload.event.parts.forEach((p) => div.appendChild(renderPart(p)));
+          } else {
+            div.textContent += payload.event.text;
+          }
+
+          queue.add(div);
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>maho control</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 16px;
+        max-width: 900px;
+      }
+      fieldset {
+        margin: 12px 0;
+        padding: 12px;
+      }
+      label {
+        display: block;
+        margin: 8px 0;
+      }
+      input,
+      textarea {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 6px;
+      }
+      textarea {
+        min-height: 70px;
+      }
+      .row {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .row > * {
+        flex: 1 1 220px;
+      }
+      button {
+        padding: 8px 12px;
+      }
+      #status {
+        font-weight: 600;
+      }
+      #log {
+        border: 1px solid #ccc;
+        padding: 8px;
+        height: 240px;
+        overflow: auto;
+        white-space: pre-wrap;
+      }
+      code {
+        background: #f4f4f4;
+        padding: 2px 4px;
+      }
+      label.checkbox {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 8px 0;
+      }
+      label.checkbox input[type="checkbox"] {
+        width: auto;
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>maho control</h1>
+
+    <div>Status: <span id="status">Connecting...</span></div>
+    <div>Overlay URL: <code id="overlay-url"></code></div>
+
+    <fieldset>
+      <legend>Configuration</legend>
+
+      <div class="row">
+        <label>
+          Twitch channel
+          <input id="channel" autocomplete="off" />
+        </label>
+
+        <label>
+          7TV emote set ID
+          <input id="seventv" placeholder="e.g. 60ae..." autocomplete="off" />
+        </label>
+      </div>
+
+      <div class="row">
+        <label>
+          Max messages
+          <input id="maxMessages" type="number" />
+        </label>
+
+        <label>
+          Lifetime (ms)
+          <input id="lifetimeMs" type="number" />
+        </label>
+
+        <label>
+          Fade (ms)
+          <input id="fadeMs" type="number" />
+        </label>
+      </div>
+
+      <div class="row">
+        <label class="checkbox"><input type="checkbox" id="disappear" /> Disappear</label>
+        <label class="checkbox"><input type="checkbox" id="showNames" /> Show Names</label>
+        <label class="checkbox"><input type="checkbox" id="hideLinks" /> Hide Links</label>
+      </div>
+
+      <label>
+        Blocklist (comma separated)
+        <textarea id="blocklist"></textarea>
+      </label>
+
+      <button id="apply" type="button">Apply</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>Debugger</legend>
+      <div class="row">
+        <label>
+          Message text
+          <input id="debugText" value="pog" />
+        </label>
+        <div style="flex: 0 0 auto; align-self: end">
+          <button id="debugSend" type="button">Simulate Chat</button>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Log</legend>
+      <pre id="log"></pre>
+    </fieldset>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+
+      const els = {
+        channel: $("channel"),
+        seventv: $("seventv"),
+        maxMessages: $("maxMessages"),
+        lifetimeMs: $("lifetimeMs"),
+        fadeMs: $("fadeMs"),
+        disappear: $("disappear"),
+        showNames: $("showNames"),
+        hideLinks: $("hideLinks"),
+        blocklist: $("blocklist"),
+        status: $("status"),
+        log: $("log"),
+        url: $("overlay-url"),
+        apply: $("apply"),
+        debugText: $("debugText"),
+        debugSend: $("debugSend"),
+      };
+
+      els.url.textContent = `${location.protocol}//${location.host}/overlay`;
+
+      let currentConfig = {};
+
+      function log(line) {
+        const ts = new Date().toLocaleTimeString();
+        const next = `[${ts}] ${line}\n` + els.log.textContent;
+        els.log.textContent = next.slice(0, 10000);
+      }
+
+      function setStatus(text, ok) {
+        els.status.textContent = text;
+        els.status.style.color = ok ? "green" : "crimson";
+      }
+
+      function syncUI(c) {
+        els.channel.value = c.channel ?? "";
+        els.seventv.value = c.seventvEmoteSetId ?? "";
+        els.maxMessages.value = c.maxMessages ?? "";
+        els.lifetimeMs.value = c.lifetimeMs ?? "";
+        els.fadeMs.value = c.fadeMs ?? "";
+        els.disappear.checked = !!c.disappear;
+        els.showNames.checked = !!c.showNames;
+        els.hideLinks.checked = !!c.hideLinks;
+        els.blocklist.value = Array.isArray(c.blocklist)
+          ? c.blocklist.join(", ")
+          : "";
+      }
+
+      function readUI() {
+        return {
+          ...currentConfig,
+          channel: els.channel.value.trim(),
+          seventvEmoteSetId: els.seventv.value.trim() || undefined,
+          maxMessages: Number(els.maxMessages.value),
+          lifetimeMs: Number(els.lifetimeMs.value),
+          fadeMs: Number(els.fadeMs.value),
+          disappear: els.disappear.checked,
+          showNames: els.showNames.checked,
+          hideLinks: els.hideLinks.checked,
+          blocklist: els.blocklist.value
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean),
+        };
+      }
+
+      const wsProto = location.protocol === "https:" ? "wss:" : "ws:";
+      const ws = new WebSocket(`${wsProto}//${location.host}/ws`);
+
+      ws.addEventListener("open", () => {
+        ws.send(
+          JSON.stringify({ op: "hello", role: "control", protocolVersion: 1 })
+        );
+        setStatus("Connected", true);
+        log("WS open");
+      });
+
+      ws.addEventListener("close", () => {
+        setStatus("Disconnected", false);
+        log("WS close");
+      });
+
+      ws.addEventListener("error", () => {
+        setStatus("Error", false);
+        log("WS error");
+      });
+
+      ws.addEventListener("message", (e) => {
+        let msg;
+        try {
+          msg = JSON.parse(e.data);
+        } catch {
+          return log("Bad JSON from server");
+        }
+
+        if (msg.op === "state" || msg.op === "config:changed") {
+          if (msg.config) {
+            currentConfig = msg.config;
+            syncUI(currentConfig);
+            log(`Config received (channel: ${currentConfig.channel ?? ""})`);
+          }
+          return;
+        }
+
+        if (msg.op === "error") {
+          log(`ERROR: ${msg.message ?? "unknown"}`);
+          return;
+        }
+      });
+
+      els.apply.addEventListener("click", () => {
+        const next = readUI();
+        ws.send(JSON.stringify({ op: "config:set", config: next }));
+        log("Sent config:set");
+      });
+
+      els.debugSend.addEventListener("click", async () => {
+        const text = els.debugText.value ?? "";
+        try {
+          const res = await fetch("/dev/fake", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ text }),
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          log(`Simulated: "${text}"`);
+        } catch (err) {
+          log(`Simulate failed: ${String(err)}`);
+        }
+      });
+    </script>
+  </body>
+</html>
