@@ -1,4 +1,4 @@
-import type { ChatMessageEvent } from "@maho/shared";
+import type { ChatMessageEvent, MessagePart } from "@maho/shared";
 import { evaluateEvent, type State } from "./state";
 import type { WsHub } from "./wsHub";
 
@@ -36,7 +36,7 @@ export function handleHttp(
       >;
       const text = String(body.text ?? "pog");
       const platform = "twitch";
-
+      const parts: MessagePart[] = [{ type: "text", content: text }];
       const ev: ChatMessageEvent = {
         kind: "chat.message",
         id: crypto.randomUUID(),
@@ -50,6 +50,7 @@ export function handleHttp(
           roles: [],
         },
         text,
+        parts,
         provider: { devFake: true },
       };
 
