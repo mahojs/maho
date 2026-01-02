@@ -4,15 +4,17 @@ import { PlatformSchema, UserRoleSchema } from "./events";
 export const RuleMatchSchema = z
   .object({
     kind: z.literal("chat.message"),
-    matchAll: z.boolean(),
-    platform: PlatformSchema,
-    userHasRole: UserRoleSchema,
+    matchAll: z.boolean().optional(),
+    // These must be optional to allow "Partial" matching rules
+    platform: PlatformSchema.optional(), 
+    userHasRole: UserRoleSchema.optional(),
     textIncludes: z.string().min(1).optional(),
     textRegex: z.string().min(1).max(200).optional(),
   })
   .refine(
     (m) => {
       if (m.matchAll) return true;
+      // Ensure at least one filter is active if matchAll is false
       return !!(m.platform || m.userHasRole || m.textIncludes || m.textRegex);
     },
     {
@@ -21,7 +23,7 @@ export const RuleMatchSchema = z
     }
   );
 
-export const RuleActionSchema = z.discriminatedUnion("type", [
+export const RenderActionSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("addClass"), value: z.string().min(1) }),
   z.object({
     type: z.literal("setVar"),
@@ -35,7 +37,7 @@ export const RuleSchema = z.object({
   id: z.string().min(1),
   enabled: z.boolean().default(true),
   match: RuleMatchSchema,
-  actions: z.array(RuleActionSchema).default([]),
+  actions: z.array(RenderActionSchema).default([]),
   cooldownMs: z.number().int().min(0).max(1000000).optional(),
 });
 

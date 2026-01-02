@@ -4,49 +4,20 @@ import type { Ruleset } from "./rules";
 
 export type ProtocolVersion = 1;
 export type ClientRole = "overlay" | "control";
+
 export type ClientHello = {
   op: "hello";
   role: ClientRole;
   protocolVersion: ProtocolVersion;
-  clientId?: string;
 };
 
-export type ConfigSet = {
-  op: "config:set";
-  config: AppConfig;
-};
-
-export type ConfigChanged = {
-  op: "config:changed";
-  config: AppConfig;
-};
-
-export type RulesSet = {
-  op: "rules:set";
-  rules: Ruleset;
-};
-
-export type RulesChanged = {
-  op: "rules:changed";
-  rules: Ruleset;
-};
-
-export type ServerState = {
-  op: "state";
-  config: AppConfig;
-  rules: Ruleset;
-};
-
-export type RuntimeEvent = {
-  op: "event";
-  payload: EvaluatedEvent;
-};
-
-export type ProtocolError = {
-  op: "error";
-  message: string;
-  details?: unknown;
-};
+export type ConfigSet = { op: "config:set"; config: AppConfig };
+export type ConfigChanged = { op: "config:changed"; config: AppConfig };
+export type RulesSet = { op: "rules:set"; rules: Ruleset };
+export type RulesChanged = { op: "rules:changed"; rules: Ruleset };
+export type ServerState = { op: "state"; config: AppConfig; rules: Ruleset };
+export type RuntimeEvent = { op: "event"; payload: EvaluatedEvent };
+export type ProtocolError = { op: "error"; message: string; details?: unknown };
 
 export type ServerToClient =
   | ServerState
