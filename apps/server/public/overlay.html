@@ -212,13 +212,13 @@
           queue.reset();
           lastRevision = -1;
 
-          for (const entry of msg.events) {
-            if (typeof entry.revision === "number") {
-              if (entry.revision < lastRevision) continue;
-              lastRevision = entry.revision;
+          msg.events.forEach((e) => {
+            if (typeof e.revision === "number") {
+              if (e.revision < lastRevision) return;
+              lastRevision = e.revision;
             }
-            applyEvent(entry.payload);
-          }
+            applyEvent(e.payload);
+          });
 
           queue.prune();
           return;
