@@ -2,7 +2,7 @@ import type { ProtocolVersion } from "@maho/shared";
 import { createInitialState, evaluateEvent } from "./state";
 import { createWsHub } from "./wsHub";
 import { handleHttp } from "./routes";
-import { loadOrCreateStateFile, saveStateFile } from "./store";
+import { loadOrCreateStateFile, saveStateFile, resolveAppDataPath } from "./store";
 import { loadEmotes } from "./emotes";
 import { appendEvent } from "./commands";
 import { connectTwitchIrc } from "@maho/twitch";
@@ -10,7 +10,12 @@ import { connectTwitchIrc } from "@maho/twitch";
 const PORT = Number(process.env.PORT ?? 3000);
 const SUPPORTED_PROTOCOL: ProtocolVersion = 1;
 
-const { filePath, state: persisted } = await loadOrCreateStateFile();
+const DATA_DIR = resolveAppDataPath();
+console.log(`[storage] using data directory: ${DATA_DIR}`);
+
+const { filePath, state: persisted } = await loadOrCreateStateFile({
+  dataDir: DATA_DIR
+});
 
 const state = createInitialState({
   config: persisted.config,

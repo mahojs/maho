@@ -6,6 +6,7 @@ import {
 } from "@maho/shared";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import os from "node:os";
 
 export type PersistedStateV1 = {
   version: 1;
@@ -24,6 +25,7 @@ export const DEFAULT_PERSISTED_STATE: PersistedStateV1 = {
     showNames: true,
     hideLinks: false,
     blocklist: [],
+    customCss: "",
   },
   rules: {
     version: 1,
@@ -47,9 +49,31 @@ function parsePersistedStateV1(input: unknown): PersistedStateV1 {
   return { version: 1, config, rules };
 }
 
-export function resolveDataDir(): string {
-  // temp local ./data
-  return process.env.MAHO_DATA_DIR ?? path.resolve(process.cwd(), "data");
+export function resolveAppDataPath(): string {
+  // allow CLI override via env var
+  if (process.env.MAHO_DATA_DIR) {
+    return process.env.MAHO_DATA_DIR;
+  }
+
+  const home = os.homedir();
+  const platform = os.platform();
+
+  // windows: %APPDATA%/maho
+  if (platform === "win32") {
+    return path.join(
+      process.env.APPDATA ?? path.join(home, "AppData", "Roaming"),
+      "maho"
+    );
+  }
+
+  // mac: ~/Library/Application Support/maho
+  if (platform === "darwin") {
+    return path.join(home, "Library", "Application Support", "maho");
+  }
+
+  // linux: ~/.config/maho
+  const configHome = process.env.XDG_CONFIG_HOME ?? path.join(home, ".config");
+  return path.join(configHome, "maho");
 }
 
 export function resolveStateFile(dataDir: string): string {
@@ -60,7 +84,7 @@ export async function loadOrCreateStateFile(opts?: {
   dataDir?: string;
   defaults?: PersistedStateV1;
 }): Promise<{ dataDir: string; filePath: string; state: PersistedStateV1 }> {
-  const dataDir = opts?.dataDir ?? resolveDataDir();
+  const dataDir = opts?.dataDir ?? resolveAppDataPath();
   const filePath = resolveStateFile(dataDir);
   const defaults = opts?.defaults ?? DEFAULT_PERSISTED_STATE;
 
