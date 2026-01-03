@@ -1,10 +1,14 @@
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
+import tailwindcss from "@tailwindcss/vite";
 
 const SERVER = process.env.MAHO_SERVER_ORIGIN ?? "http://localhost:3000";
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [
+    tailwindcss(),
+    vue(),
+  ],
   base: "/control/",
   build: {
     outDir: "../server/public/control",
@@ -12,18 +16,9 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      "/ws": {
-        target: SERVER,
-        ws: true,
-      },
-      "/dev": {
-        target: SERVER,
-        changeOrigin: true,
-      },
-      "/health": {
-        target: SERVER,
-        changeOrigin: true,
-      },
+      "/ws": { target: SERVER, ws: true },
+      "/dev": { target: SERVER, changeOrigin: true },
+      "/health": { target: SERVER, changeOrigin: true },
     },
   },
 });
