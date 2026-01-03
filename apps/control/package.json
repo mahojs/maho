@@ -3,13 +3,19 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "echo TODO",
-    "build": "echo TODO",
-    "typecheck": "tsc -p tsconfig.json",
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "vue-tsc --noEmit",
     "lint": "eslint .",
     "test": "bun test"
   },
   "dependencies": {
-    "@maho/shared": "workspace:*"
+    "@maho/shared": "workspace:*",
+    "vue": "^3.5.26"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.3",
+    "vite": "^7.3.0",
+    "vue-tsc": "^3.2.1"
   }
 }
