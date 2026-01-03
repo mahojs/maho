@@ -23,18 +23,11 @@
         box-sizing: border-box;
       }
 
-      /* BEM Default Styles */
       .chat-line {
         margin: 4px 0;
-        padding: 8px 10px;
-        background: rgba(0, 0, 0, 0.6);
-        border-radius: 8px;
         width: fit-content;
         max-width: 100%;
-        word-wrap: break-word;
-        font-size: 16px;
-        line-height: 1.4;
-
+        display: block;
         opacity: 0;
         transform: translateY(10px);
         transition:
@@ -60,22 +53,27 @@
         text-decoration: line-through;
       }
 
-      .chat-line__meta {
+      .chat-line__header {
         display: inline;
         font-weight: 700;
         margin-right: 4px;
       }
 
-      .chat-line__name {
+      .chat-line__body {
+        display: inline;
+        background: rgba(0, 0, 0, 0.6);
+        border-radius: 8px;
+        padding: 4px 8px;
+        line-height: 1.4;
+        word-wrap: break-word;
+      }
+
+      .chat-line__author {
         color: #a970ff; /* fallback */
       }
 
       .chat-line__separator {
         margin-right: 4px;
-      }
-
-      .chat-line__message {
-        display: inline;
       }
 
       .chat-line__part-emote {
@@ -96,7 +94,7 @@
         text-decoration: underline;
       }
 
-      /* compatibility alias for other tools? */
+      /* compatibility alias */
       .message-row {
         display: block;
       }
@@ -208,8 +206,7 @@
 
         const div = document.createElement("div");
         div.className = "chat-line";
-        // compatiblity alias
-        div.classList.add("message-row");
+        div.classList.add("message-row"); // compatibility alias
 
         div.dataset.id = ev.id;
         div.dataset.platform = ev.platform;
@@ -219,7 +216,6 @@
         ev.user.roles.forEach((role) => {
           div.dataset["role" + role.charAt(0).toUpperCase() + role.slice(1)] =
             "true";
-          // compatibility class
           div.classList.add("user-" + role);
         });
 
@@ -230,38 +226,37 @@
             div.style.setProperty("--" + a.name, a.value);
         });
 
-        if (config.showNames) {
-          const meta = document.createElement("div");
-          meta.className = "chat-line__meta";
+        const header = document.createElement("div");
+        header.className = "chat-line__header";
 
+        if (config.showNames) {
           const name = document.createElement("span");
-          name.className = "chat-line__name";
+          name.className = "chat-line__author";
           name.textContent = ev.user.displayName;
           name.style.color = ev.user.color || "#a970ff";
 
-          // add user color as variable for CSS
           div.style.setProperty("--user-color", ev.user.color || "#a970ff");
 
-          meta.appendChild(name);
+          header.appendChild(name);
 
           const sep = document.createElement("span");
           sep.className = "chat-line__separator";
           sep.textContent = ": ";
-          meta.appendChild(sep);
+          header.appendChild(sep);
 
-          div.appendChild(meta);
+          div.appendChild(header);
         }
 
-        const msgContent = document.createElement("div");
-        msgContent.className = "chat-line__message";
+        const body = document.createElement("div");
+        body.className = "chat-line__body";
 
         if (ev.parts) {
-          ev.parts.forEach((p) => msgContent.appendChild(renderPart(p)));
+          ev.parts.forEach((p) => body.appendChild(renderPart(p)));
         } else {
-          msgContent.textContent = ev.text;
+          body.textContent = ev.text;
         }
 
-        div.appendChild(msgContent);
+        div.appendChild(body);
 
         queue.add(div);
       }
