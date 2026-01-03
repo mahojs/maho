@@ -3,6 +3,7 @@ import type { EvaluatedEvent } from "./actions";
 import type { Ruleset } from "./rules";
 
 export type ProtocolVersion = 1;
+
 export type ClientRole = "overlay" | "control";
 
 export type ClientHello = {
@@ -12,33 +13,48 @@ export type ClientHello = {
 };
 
 export type ConfigSet = { op: "config:set"; config: AppConfig };
+
 export type ConfigChanged = {
   op: "config:changed";
   revision: number;
   config: AppConfig;
 };
+
 export type RulesSet = { op: "rules:set"; rules: Ruleset };
+
 export type RulesChanged = {
   op: "rules:changed";
   revision: number;
   rules: Ruleset;
 };
+
 export type ServerState = {
   op: "state";
   revision: number;
   config: AppConfig;
   rules: Ruleset;
 };
+
 export type RuntimeEvent = {
   op: "event";
   revision: number;
   payload: EvaluatedEvent;
 };
+
 export type Replay = {
   op: "replay";
   events: { revision: number; payload: EvaluatedEvent }[];
 };
+
 export type ProtocolError = { op: "error"; message: string; details?: unknown };
+
+export type ControlNotice = {
+  op: "control:notice";
+  revision: number;
+  level: "info" | "warn" | "error";
+  message: string;
+  details?: unknown;
+};
 
 export type ServerToClient =
   | ServerState
@@ -46,6 +62,7 @@ export type ServerToClient =
   | RulesChanged
   | RuntimeEvent
   | Replay
-  | ProtocolError;
+  | ProtocolError
+  | ControlNotice;
 
 export type ClientToServer = ClientHello | ConfigSet | RulesSet;
