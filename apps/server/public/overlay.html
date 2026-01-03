@@ -114,6 +114,11 @@
           el.style.transitionDuration = config.fadeMs + "ms";
           setTimeout(() => el.remove(), config.fadeMs);
         }
+
+        reset() {
+          this.items = [];
+          wrap.innerHTML = "";
+        }
       }
 
       const queue = new Queue();
@@ -151,6 +156,31 @@
         return document.createTextNode("");
       }
 
+      function applyEvent(payload) {
+        const div = document.createElement("div");
+        div.className = "msg";
+
+        const isSuppressed = (payload.actions || []).some(
+          (a) => a.type === "suppress"
+        );
+        if (isSuppressed) div.classList.add("suppressed");
+
+        if (config.showNames) {
+          const b = document.createElement("b");
+          b.textContent = payload.event.user.displayName + ": ";
+          b.style.color = payload.event.user.color || "#a970ff";
+          div.appendChild(b);
+        }
+
+        if (payload.event.parts) {
+          payload.event.parts.forEach((p) => div.appendChild(renderPart(p)));
+        } else {
+          div.textContent += payload.event.text;
+        }
+
+        queue.add(div);
+      }
+
       ws.addEventListener("open", () => {
         ws.send(
           JSON.stringify({ op: "hello", role: "overlay", protocolVersion: 1 })
@@ -170,32 +200,28 @@
             config = { ...config, ...msg.config };
             queue.prune();
           }
+          return;
         }
 
         if (msg.op === "event") {
-          const payload = msg.payload;
-          const div = document.createElement("div");
-          div.className = "msg";
+          applyEvent(msg.payload);
+          return;
+        }
 
-          const isSuppressed = (payload.actions || []).some(
-            (a) => a.type === "suppress"
-          );
-          if (isSuppressed) div.classList.add("suppressed");
+        if (msg.op === "replay") {
+          queue.reset();
+          lastRevision = -1;
 
-          if (config.showNames) {
-            const b = document.createElement("b");
-            b.textContent = payload.event.user.displayName + ": ";
-            b.style.color = payload.event.user.color || "#a970ff";
-            div.appendChild(b);
+          for (const entry of msg.events) {
+            if (typeof entry.revision === "number") {
+              if (entry.revision < lastRevision) continue;
+              lastRevision = entry.revision;
+            }
+            applyEvent(entry.payload);
           }
 
-          if (payload.event.parts) {
-            payload.event.parts.forEach((p) => div.appendChild(renderPart(p)));
-          } else {
-            div.textContent += payload.event.text;
-          }
-
-          queue.add(div);
+          queue.prune();
+          return;
         }
       });
     </script>
