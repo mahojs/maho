@@ -58,7 +58,8 @@ function startTwitch(channel: string) {
     onStatus: (s) => console.log(s),
     onChatMessage: (ev) => {
       const payload = evaluateEvent(state, ev);
-      hub.broadcast({ op: "event", payload });
+      state.revision++;
+      hub.broadcast({ op: "event", revision: state.revision, payload });
     },
   });
 }

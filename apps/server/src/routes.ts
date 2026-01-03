@@ -41,7 +41,7 @@ export function handleHttp(
       >;
       const text = String(body.text ?? "pog");
       const platform = "twitch";
-      
+
       const parts: MessagePart[] = [{ type: "text", content: text }];
 
       const ev: ChatMessageEvent = {
@@ -62,7 +62,8 @@ export function handleHttp(
       };
 
       const payload = evaluateEvent(state, ev);
-      hub.broadcast({ op: "event", payload });
+      state.revision++;
+      hub.broadcast({ op: "event", revision: state.revision, payload });
       return new Response("sent");
     })() as unknown as Response;
   }
