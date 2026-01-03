@@ -17,6 +17,8 @@ export type State = {
   ruleset: Ruleset;
   engine: RulesEngine;
   emoteMap: EmoteMap;
+  eventLog: { revision: number; payload: EvaluatedEvent }[];
+  eventLogMax: number;
 };
 
 export function createInitialState(seed?: {
@@ -49,6 +51,8 @@ export function createInitialState(seed?: {
     ruleset,
     engine: createRulesEngine(ruleset),
     emoteMap: new Map(),
+    eventLog: [],
+    eventLogMax: 200,
   };
 }
 
