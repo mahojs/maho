@@ -96,6 +96,7 @@ export function createControlWs(opts?: {
       case "state": {
         state.serverConfig = msg.config;
         state.serverRules = msg.rules;
+        state.lastError = undefined;
         pushLog(state, {
           kind: "info",
           ts: now(),
@@ -106,6 +107,7 @@ export function createControlWs(opts?: {
 
       case "config:changed": {
         state.serverConfig = msg.config;
+        state.lastError = undefined;
         pushLog(state, {
           kind: "info",
           ts: now(),
@@ -116,6 +118,7 @@ export function createControlWs(opts?: {
 
       case "rules:changed": {
         state.serverRules = msg.rules;
+        state.lastError = undefined;
         pushLog(state, {
           kind: "info",
           ts: now(),
