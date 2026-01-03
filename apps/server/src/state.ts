@@ -21,7 +21,6 @@ export type State = {
 
 export function createInitialState(seed?: {
   config: AppConfig;
-  revision: 0;
   ruleset: Ruleset;
 }): State {
   const config =
