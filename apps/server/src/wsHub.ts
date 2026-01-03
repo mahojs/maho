@@ -108,7 +108,12 @@ export function createWsHub(
       }
 
       roles.set(ws, msg.role);
-      send(ws, { op: "state", config: state.config, rules: state.ruleset });
+      send(ws, {
+        op: "state",
+        revision: state.revision,
+        config: state.config,
+        rules: state.ruleset,
+      });
       return;
     }
 
@@ -162,7 +167,11 @@ export function createWsHub(
 
         if (token !== configCommitToken) return;
 
-        broadcast({ op: "config:changed", config: state.config });
+        broadcast({
+          op: "config:changed",
+          revision: state.revision,
+          config: state.config,
+        });
         hooks?.onConfigChanged?.(state.config, prev);
       })();
 
@@ -213,7 +222,11 @@ export function createWsHub(
 
         if (token !== rulesCommitToken) return;
 
-        broadcast({ op: "rules:changed", rules: state.ruleset });
+        broadcast({
+          op: "rules:changed",
+          revision: state.revision,
+          rules: state.ruleset,
+        });
       })();
 
       return;
