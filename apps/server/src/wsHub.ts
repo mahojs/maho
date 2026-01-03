@@ -72,6 +72,23 @@ export function createWsHub(
     }
   }
 
+  function commitAndPublish(opts: {
+    isStale: () => boolean;
+    onPersistFail: (e: unknown) => void;
+    onCommitted: () => void;
+  }) {
+    (async () => {
+      try {
+        await persist();
+      } catch (e) {
+        opts.onPersistFail(e);
+        return;
+      }
+      if (opts.isStale()) return;
+      opts.onCommitted();
+    })();
+  }
+
   function onOpen(ws: WS) {
     clients.add(ws);
   }
@@ -151,10 +168,10 @@ export function createWsHub(
 
       state.config = next;
 
-      (async () => {
-        try {
-          await persist();
-        } catch (e) {
+      commitAndPublish({
+        isStale: () => token !== configCommitToken,
+
+        onPersistFail: (e) => {
           state.config = prev;
 
           const errMsg = {
@@ -165,18 +182,20 @@ export function createWsHub(
 
           send(ws, errMsg);
           broadcastToControl(errMsg, ws);
-          return;
-        }
+        },
 
-        if (token !== configCommitToken) return;
+        onCommitted: () => {
+          state.revision++;
 
-        broadcast({
-          op: "config:changed",
-          revision: state.revision,
-          config: state.config,
-        });
-        hooks?.onConfigChanged?.(state.config, prev);
-      })();
+          broadcast({
+            op: "config:changed",
+            revision: state.revision,
+            config: state.config,
+          });
+
+          hooks?.onConfigChanged?.(state.config, prev);
+        },
+      });
 
       return;
     }
@@ -206,10 +225,10 @@ export function createWsHub(
 
       setRuleset(state, next);
 
-      (async () => {
-        try {
-          await persist();
-        } catch (e) {
+      commitAndPublish({
+        isStale: () => token !== rulesCommitToken,
+
+        onPersistFail: (e) => {
           setRuleset(state, prev);
 
           const errMsg = {
@@ -220,17 +239,18 @@ export function createWsHub(
 
           send(ws, errMsg);
           broadcastToControl(errMsg, ws);
-          return;
-        }
+        },
 
-        if (token !== rulesCommitToken) return;
+        onCommitted: () => {
+          state.revision++;
 
-        broadcast({
-          op: "rules:changed",
-          revision: state.revision,
-          rules: state.ruleset,
-        });
-      })();
+          broadcast({
+            op: "rules:changed",
+            revision: state.revision,
+            rules: state.ruleset,
+          });
+        },
+      });
 
       return;
     }
