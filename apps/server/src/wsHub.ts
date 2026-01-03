@@ -173,15 +173,23 @@ export function createWsHub(
 
         onPersistFail: (e) => {
           state.config = prev;
+          const err = String(e);
 
-          const errMsg = {
+          send(ws, {
             op: "error",
             message: "failed to persist config; change was not applied",
-            details: String(e),
+            details: err,
+          });
+
+          const notice = {
+            op: "control:notice",
+            revision: state.revision,
+            level: "error",
+            message: "failed to persist config; change was not applied",
+            details: err,
           } as const;
 
-          send(ws, errMsg);
-          broadcastToControl(errMsg, ws);
+          broadcastToControl(notice, ws);
         },
 
         onCommitted: () => {
@@ -230,15 +238,23 @@ export function createWsHub(
 
         onPersistFail: (e) => {
           setRuleset(state, prev);
+          const err = String(e);
 
-          const errMsg = {
+          send(ws, {
             op: "error",
             message: "failed to persist rules; change was not applied",
-            details: String(e),
+            details: err,
+          });
+
+          const notice = {
+            op: "control:notice",
+            revision: state.revision,
+            level: "error",
+            message: "failed to persist rules; change was not applied",
+            details: err,
           } as const;
 
-          send(ws, errMsg);
-          broadcastToControl(errMsg, ws);
+          broadcastToControl(notice, ws);
         },
 
         onCommitted: () => {
