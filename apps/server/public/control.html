@@ -164,6 +164,7 @@
       els.url.textContent = `${location.protocol}//${location.host}/overlay`;
 
       let currentConfig = {};
+      let lastRevision = -1;
 
       function log(line) {
         const ts = new Date().toLocaleTimeString();
@@ -243,6 +244,10 @@
         let msg;
         try {
           msg = JSON.parse(e.data);
+          if (typeof msg.revision === "number") {
+            if (msg.revision < lastRevision) return;
+            lastRevision = msg.revision;
+          }
         } catch {
           return log("Bad JSON from server");
         }

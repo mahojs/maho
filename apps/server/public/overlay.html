@@ -73,6 +73,7 @@
       const wsProto = location.protocol === "https:" ? "wss:" : "ws:";
       const ws = new WebSocket(`${wsProto}//${location.host}/ws`);
 
+      let lastRevision = -1;
       let config = {
         maxMessages: 10,
         lifetimeMs: 10000,
@@ -158,6 +159,11 @@
 
       ws.addEventListener("message", (e) => {
         const msg = JSON.parse(e.data);
+
+        if (typeof msg.revision === "number") {
+          if (msg.revision < lastRevision) return;
+          lastRevision = msg.revision;
+        }
 
         if (msg.op === "state" || msg.op === "config:changed") {
           if (msg.config) {
