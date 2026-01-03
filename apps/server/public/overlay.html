@@ -8,7 +8,10 @@
         margin: 0;
         background: transparent;
         color: #fff;
-        font-family: system-ui;
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
         overflow: hidden;
       }
       #wrap {
@@ -19,14 +22,19 @@
         height: 100vh;
         box-sizing: border-box;
       }
-      .msg {
+
+      /* BEM Default Styles */
+      .chat-line {
         margin: 4px 0;
         padding: 8px 10px;
         background: rgba(0, 0, 0, 0.6);
         border-radius: 8px;
         width: fit-content;
+        max-width: 100%;
+        word-wrap: break-word;
         font-size: 16px;
         line-height: 1.4;
+
         opacity: 0;
         transform: translateY(10px);
         transition:
@@ -34,35 +42,63 @@
           transform 0.4s ease;
         animation: enter 0.4s forwards;
       }
+
       @keyframes enter {
         to {
           opacity: 1;
           transform: translateY(0);
         }
       }
-      .msg.exiting {
+
+      .chat-line--exiting {
         opacity: 0;
         transform: translateY(-10px);
       }
-      .suppressed {
+
+      .chat-line--suppressed {
         opacity: 0.5;
         text-decoration: line-through;
       }
 
-      .part-emote {
+      .chat-line__meta {
+        display: inline;
+        font-weight: 700;
+        margin-right: 4px;
+      }
+
+      .chat-line__name {
+        color: #a970ff; /* fallback */
+      }
+
+      .chat-line__separator {
+        margin-right: 4px;
+      }
+
+      .chat-line__message {
+        display: inline;
+      }
+
+      .chat-line__part-emote {
         height: 1.2em;
         vertical-align: middle;
         margin: 0 2px;
       }
-      .part-mention {
+
+      .chat-line__part-mention {
         font-weight: bold;
         background: rgba(255, 255, 255, 0.1);
         border-radius: 4px;
         padding: 0 4px;
       }
-      .part-link {
+
+      .chat-line__part-link {
         color: #aaa;
         text-decoration: underline;
+      }
+
+      /* compatibility alias for other tools? */
+      .message-row {
+        display: block;
       }
     </style>
   </head>
@@ -70,6 +106,14 @@
     <div id="wrap"></div>
     <script>
       const wrap = document.getElementById("wrap");
+
+      let styleTag = document.getElementById("maho-custom-css");
+      if (!styleTag) {
+        styleTag = document.createElement("style");
+        styleTag.id = "maho-custom-css";
+        document.head.appendChild(styleTag);
+      }
+
       const wsProto = location.protocol === "https:" ? "wss:" : "ws:";
       const ws = new WebSocket(`${wsProto}//${location.host}/ws`);
 
@@ -80,6 +124,7 @@
         fadeMs: 400,
         disappear: true,
         showNames: true,
+        customCss: "",
       };
 
       class Queue {
@@ -109,8 +154,8 @@
         }
 
         remove(el) {
-          if (el.classList.contains("exiting")) return;
-          el.classList.add("exiting");
+          if (el.classList.contains("chat-line--exiting")) return;
+          el.classList.add("chat-line--exiting");
           el.style.transitionDuration = config.fadeMs + "ms";
           setTimeout(() => el.remove(), config.fadeMs);
         }
@@ -125,9 +170,9 @@
 
       function renderPart(part) {
         if (part.type === "text") return document.createTextNode(part.content);
+
         if (part.type === "emote") {
           const img = document.createElement("img");
-
           if (part.url) {
             img.src = part.url;
           } else {
@@ -136,20 +181,21 @@
               part.id +
               "/default/dark/1.0";
           }
-
-          img.className = "part-emote";
+          img.className = "chat-line__part-emote";
           img.alt = part.name;
           return img;
         }
+
         if (part.type === "mention") {
           const span = document.createElement("span");
-          span.className = "part-mention";
+          span.className = "chat-line__part-mention";
           span.textContent = "@" + part.user;
           return span;
         }
+
         if (part.type === "link") {
           const a = document.createElement("span");
-          a.className = "part-link";
+          a.className = "chat-line__part-link";
           a.textContent = "[link]";
           return a;
         }
@@ -157,28 +203,75 @@
       }
 
       function applyEvent(payload) {
-        const div = document.createElement("div");
-        div.className = "msg";
+        const ev = payload.event;
+        const actions = payload.actions || [];
 
-        const isSuppressed = (payload.actions || []).some(
-          (a) => a.type === "suppress"
-        );
-        if (isSuppressed) div.classList.add("suppressed");
+        const div = document.createElement("div");
+        div.className = "chat-line";
+        // compatiblity alias
+        div.classList.add("message-row");
+
+        div.dataset.id = ev.id;
+        div.dataset.platform = ev.platform;
+        div.dataset.user = ev.user.login;
+        if (ev.user.id) div.dataset.userId = ev.user.id;
+
+        ev.user.roles.forEach((role) => {
+          div.dataset["role" + role.charAt(0).toUpperCase() + role.slice(1)] =
+            "true";
+          // compatibility class
+          div.classList.add("user-" + role);
+        });
+
+        actions.forEach((a) => {
+          if (a.type === "suppress") div.classList.add("chat-line--suppressed");
+          if (a.type === "addClass") div.classList.add(a.value);
+          if (a.type === "setVar")
+            div.style.setProperty("--" + a.name, a.value);
+        });
 
         if (config.showNames) {
-          const b = document.createElement("b");
-          b.textContent = payload.event.user.displayName + ": ";
-          b.style.color = payload.event.user.color || "#a970ff";
-          div.appendChild(b);
+          const meta = document.createElement("div");
+          meta.className = "chat-line__meta";
+
+          const name = document.createElement("span");
+          name.className = "chat-line__name";
+          name.textContent = ev.user.displayName;
+          name.style.color = ev.user.color || "#a970ff";
+
+          // add user color as variable for CSS
+          div.style.setProperty("--user-color", ev.user.color || "#a970ff");
+
+          meta.appendChild(name);
+
+          const sep = document.createElement("span");
+          sep.className = "chat-line__separator";
+          sep.textContent = ": ";
+          meta.appendChild(sep);
+
+          div.appendChild(meta);
         }
 
-        if (payload.event.parts) {
-          payload.event.parts.forEach((p) => div.appendChild(renderPart(p)));
+        const msgContent = document.createElement("div");
+        msgContent.className = "chat-line__message";
+
+        if (ev.parts) {
+          ev.parts.forEach((p) => msgContent.appendChild(renderPart(p)));
         } else {
-          div.textContent += payload.event.text;
+          msgContent.textContent = ev.text;
         }
+
+        div.appendChild(msgContent);
 
         queue.add(div);
+      }
+
+      function updateConfig(newConfig) {
+        config = { ...config, ...newConfig };
+        queue.prune();
+        if (typeof config.customCss === "string") {
+          styleTag.textContent = config.customCss;
+        }
       }
 
       ws.addEventListener("open", () => {
@@ -196,10 +289,7 @@
         }
 
         if (msg.op === "state" || msg.op === "config:changed") {
-          if (msg.config) {
-            config = { ...config, ...msg.config };
-            queue.prune();
-          }
+          if (msg.config) updateConfig(msg.config);
           return;
         }
 
@@ -223,8 +313,6 @@
           queue.prune();
           return;
         }
-
-        if (msg.op === "control:notice") return;
       });
     </script>
   </body>
