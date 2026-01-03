@@ -1,6 +1,7 @@
 import type { ChatMessageEvent, MessagePart } from "@maho/shared";
 import { evaluateEvent, type State } from "./state";
 import type { WsHub } from "./wsHub";
+import { appendEvent } from "./commands";
 import path from "node:path";
 
 function json(data: unknown, status = 200) {
@@ -62,20 +63,13 @@ export function handleHttp(
       };
 
       const payload = evaluateEvent(state, ev);
-
-      state.revision++;
-      const entry = { revision: state.revision, payload };
-
-      state.eventLog.push(entry);
-      if (state.eventLog.length > state.eventLogMax) {
-        state.eventLog.splice(0, state.eventLog.length - state.eventLogMax);
-      }
-
+      const entry = appendEvent(state, payload);
       hub.broadcast({
         op: "event",
         revision: entry.revision,
         payload: entry.payload,
       });
+
       return new Response("sent");
     })() as unknown as Response;
   }

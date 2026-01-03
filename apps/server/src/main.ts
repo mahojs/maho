@@ -4,6 +4,7 @@ import { createWsHub } from "./wsHub";
 import { handleHttp } from "./routes";
 import { loadOrCreateStateFile, saveStateFile } from "./store";
 import { loadEmotes } from "./emotes";
+import { appendEvent } from "./commands";
 import { connectTwitchIrc } from "@maho/twitch";
 
 const PORT = Number(process.env.PORT ?? 3000);
@@ -58,15 +59,7 @@ function startTwitch(channel: string) {
     onStatus: (s) => console.log(s),
     onChatMessage: (ev) => {
       const payload = evaluateEvent(state, ev);
-
-      state.revision++;
-      const entry = { revision: state.revision, payload };
-
-      state.eventLog.push(entry);
-      if (state.eventLog.length > state.eventLogMax) {
-        state.eventLog.splice(0, state.eventLog.length - state.eventLogMax);
-      }
-
+      const entry = appendEvent(state, payload);
       hub.broadcast({
         op: "event",
         revision: entry.revision,
