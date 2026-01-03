@@ -114,6 +114,9 @@ export function createWsHub(
         config: state.config,
         rules: state.ruleset,
       });
+      if (msg.role === "overlay") {
+        send(ws, { op: "replay", events: state.eventLog });
+      }
       return;
     }
 
