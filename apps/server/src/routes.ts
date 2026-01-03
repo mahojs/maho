@@ -12,6 +12,7 @@ function json(data: unknown, status = 200) {
 }
 
 const PUBLIC_DIR = path.resolve(process.cwd(), "public");
+const CONTROL_DIR = path.join(PUBLIC_DIR, "control");
 
 export function handleHttp(
   req: Request,
@@ -25,8 +26,15 @@ export function handleHttp(
     return new Response(Bun.file(path.join(PUBLIC_DIR, "overlay.html")));
   }
 
-  if (url.pathname === "/control") {
-    return new Response(Bun.file(path.join(PUBLIC_DIR, "control.html")));
+  if (url.pathname === "/control" || url.pathname === "/control/") {
+    return new Response(Bun.file(path.join(CONTROL_DIR, "index.html")));
+  }
+
+  if (url.pathname.startsWith("/control/")) {
+    const rel = url.pathname.slice("/control/".length); // no leading slash
+    const filePath = path.join(CONTROL_DIR, rel);
+
+    return new Response(Bun.file(filePath));
   }
 
   if (url.pathname === "/health") return new Response("ok");
