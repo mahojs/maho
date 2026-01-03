@@ -8,6 +8,18 @@ export type TwitchIrcOptions = {
   onStatus?: (s: string) => void;
 };
 
+/* U+034F: combining grapheme joiner
+   U+200B: zero width space
+   U+200C: zero width non-Joiner
+   U+200D: zero width joiner
+   U+2060: word joiner
+   U+FEFF: zero width no-break Space */
+const INVISIBLE_MARKERS_REGEX = /[\u034F\u200B-\u200D\u2060\uFEFF]/g;
+
+function sanitizeText(raw: string): string {
+  return raw.replace(INVISIBLE_MARKERS_REGEX, "").trim();
+}
+
 function parseTags(tagsPart: string | undefined): Map<string, string> {
   const tags = new Map<string, string>();
   if (!tagsPart) return tags;
@@ -149,7 +161,8 @@ export function connectTwitchIrc(opts: TwitchIrcOptions): {
         const prefix = m[2] ?? "";
         const chan = m[3] ?? channel;
         const rawText = m[4] ?? "";
-        const { text, isAction } = unwrapCtcpAction(rawText);
+        const { text: actionText, isAction } = unwrapCtcpAction(rawText);
+        const text = sanitizeText(actionText);
 
         const userLogin = (prefix.split("!")[0] || "unknown").toLowerCase();
         const tags = parseTags(tagsPart);
@@ -158,7 +171,14 @@ export function connectTwitchIrc(opts: TwitchIrcOptions): {
         const displayName = tags.get("display-name") || userLogin;
 
         const roles = rolesFromTags(tags, chan, userLogin);
-        const parts = parseMessageParts(text, tags.get("emotes"));
+
+        let parts = parseMessageParts(actionText, tags.get("emotes"));
+        parts = parts.map((p) => {
+          if (p.type === "text") {
+            return { ...p, content: sanitizeText(p.content) };
+          }
+          return p;
+        });
 
         const msgEvent: ChatMessageEvent = {
           kind: "chat.message",
