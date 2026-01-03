@@ -62,8 +62,20 @@ export function handleHttp(
       };
 
       const payload = evaluateEvent(state, ev);
+
       state.revision++;
-      hub.broadcast({ op: "event", revision: state.revision, payload });
+      const entry = { revision: state.revision, payload };
+
+      state.eventLog.push(entry);
+      if (state.eventLog.length > state.eventLogMax) {
+        state.eventLog.splice(0, state.eventLog.length - state.eventLogMax);
+      }
+
+      hub.broadcast({
+        op: "event",
+        revision: entry.revision,
+        payload: entry.payload,
+      });
       return new Response("sent");
     })() as unknown as Response;
   }
