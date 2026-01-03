@@ -4,3 +4,17 @@ data
 *.log
 .env
 .DS_Store
+
+# vite build outputs (served by apps/server in prod)
+apps/server/public/control/
+apps/server/public/overlay/
+
+# vite caches
+apps/control/node_modules/
+apps/overlay/node_modules/
+**/node_modules/
+
+# vite/TS caches
+**/.vite/
+**/.turbo/
+**/dist/
