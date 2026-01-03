@@ -223,6 +223,8 @@
           queue.prune();
           return;
         }
+
+        if (msg.op === "control:notice") return;
       });
     </script>
   </body>

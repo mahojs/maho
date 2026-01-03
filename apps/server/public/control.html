@@ -265,6 +265,14 @@
           log(`ERROR: ${msg.message ?? "unknown"}`);
           return;
         }
+
+        if (msg.op === "control:notice") {
+          const lvl = msg.level ? msg.level.toUpperCase() : "NOTICE";
+          log(
+            `${lvl}: ${msg.message}${msg.details ? " — " + JSON.stringify(msg.details) : ""}`
+          );
+          return;
+        }
       });
 
       els.apply.addEventListener("click", () => {
