@@ -93,6 +93,16 @@ function parseMessageParts(
   return parts;
 }
 
+function unwrapCtcpAction(text: string): { text: string; isAction: boolean } {
+  if (text.startsWith("\u0001ACTION ") && text.endsWith("\u0001")) {
+    return {
+      text: text.slice("\u0001ACTION ".length, -1),
+      isAction: true,
+    };
+  }
+  return { text, isAction: false };
+}
+
 export function connectTwitchIrc(opts: TwitchIrcOptions): {
   close: () => void;
 } {
@@ -138,7 +148,8 @@ export function connectTwitchIrc(opts: TwitchIrcOptions): {
         const tagsPart = m[1];
         const prefix = m[2] ?? "";
         const chan = m[3] ?? channel;
-        const text = m[4] ?? "";
+        const rawText = m[4] ?? "";
+        const { text, isAction } = unwrapCtcpAction(rawText);
 
         const userLogin = (prefix.split("!")[0] || "unknown").toLowerCase();
         const tags = parseTags(tagsPart);
@@ -166,6 +177,7 @@ export function connectTwitchIrc(opts: TwitchIrcOptions): {
           parts,
           provider: {
             twitch: {
+              isAction,
               tags: Object.fromEntries(tags.entries()),
               raw: line,
             },
