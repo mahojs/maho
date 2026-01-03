@@ -13,6 +13,7 @@ import { EmoteMap, enrichMessageParts } from "./emotes";
 
 export type State = {
   config: AppConfig;
+  revision: number;
   ruleset: Ruleset;
   engine: RulesEngine;
   emoteMap: EmoteMap;
@@ -20,6 +21,7 @@ export type State = {
 
 export function createInitialState(seed?: {
   config: AppConfig;
+  revision: 0;
   ruleset: Ruleset;
 }): State {
   const config =
@@ -44,6 +46,7 @@ export function createInitialState(seed?: {
 
   return {
     config,
+    revision: 0,
     ruleset,
     engine: createRulesEngine(ruleset),
     emoteMap: new Map(),
