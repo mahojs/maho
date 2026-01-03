@@ -23,5 +23,5 @@ export const DefaultConfig = AppConfigSchema.parse({
   showNames: true,
   hideLinks: false,
   blocklist: [],
-  customCss: [],
+  customCss: "",
 });
