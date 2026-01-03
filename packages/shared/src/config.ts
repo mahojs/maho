@@ -8,4 +8,5 @@ export type AppConfig = {
   showNames: boolean;
   hideLinks: boolean;
   blocklist: string[];
+  customCss: string;
 };

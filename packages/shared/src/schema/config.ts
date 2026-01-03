@@ -10,6 +10,7 @@ export const AppConfigSchema = z.object({
   showNames: z.boolean(),
   hideLinks: z.boolean(),
   blocklist: z.array(z.string()).default([]),
+  customCss: z.string().default(""),
 });
 
 export const DefaultConfig = AppConfigSchema.parse({
@@ -22,4 +23,5 @@ export const DefaultConfig = AppConfigSchema.parse({
   showNames: true,
   hideLinks: false,
   blocklist: [],
+  customCss: [],
 });
