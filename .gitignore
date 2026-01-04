@@ -1,20 +1,33 @@
-node_modules
-dist
-data
+# dependencies
+node_modules/
+**/node_modules/
+
+# build outputs & caches
+dist/
+**/dist/
+out/
+*.tgz
+
+# other caches
+.vite/
+**/.vite/
+.turbo/
+**/.turbo/
+*.tsbuildinfo
+**/.vitepress/cache/
+
+# local data & logs
+data/
+logs/
 *.log
 .env
 .DS_Store
 
-# vite build outputs (served by apps/server in prod)
+# editor junk
+.eslintcache
+.cache
+coverage/
+report.*.json
+
 apps/server/public/control/
 apps/server/public/overlay/
-
-# vite caches
-apps/control/node_modules/
-apps/overlay/node_modules/
-**/node_modules/
-
-# vite/TS caches
-**/.vite/
-**/.turbo/
-**/dist/
