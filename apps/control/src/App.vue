@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { createControlWs, type ControlLogEntry } from "./lib/ws";
+import { useControlConnection } from "./lib/ws";
+import { useServerStore, type ControlLogEntry } from "./stores/server";
 import ConfigEditor from "./components/ConfigEditor.vue";
 import RulesEditor from "./components/RulesEditor.vue";
 import logoUrl from "./assets/logo.png";
 
-const client = createControlWs();
-const state = client.state;
+const store = useServerStore();
+const client = useControlConnection();
 
 type Tab = "console" | "config" | "rules";
 const tab = ref<Tab>("console");
@@ -18,7 +19,7 @@ const overlayUrl = computed(
 );
 
 const status = computed(() => {
-  switch (state.status) {
+  switch (store.status) {
     case "connected":
       return { label: "Connected", cls: "bg-emerald-600" };
     case "connecting":
@@ -89,14 +90,14 @@ function tabBtn(t: Tab) {
           >
             {{ status.label }}
           </span>
-          <span v-if="state.revision >= 0" class="font-mono"
-            >rev {{ state.revision }}</span
+          <span v-if="store.revision >= 0" class="font-mono"
+            >rev {{ store.revision }}</span
           >
-          <span v-if="state.serverConfig?.channel" class="font-mono"
-            >#{{ state.serverConfig.channel }}</span
+          <span v-if="store.serverConfig?.channel" class="font-mono"
+            >#{{ store.serverConfig.channel }}</span
           >
-          <span v-if="state.lastError" class="text-red-600">{{
-            state.lastError
+          <span v-if="store.lastError" class="text-red-600">{{
+            store.lastError
           }}</span>
         </div>
       </header>
@@ -141,9 +142,7 @@ function tabBtn(t: Tab) {
               type="button"
               class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-50"
               @click="client.connect"
-              :disabled="
-                state.status === 'connected' || state.status === 'connecting'
-              "
+              :disabled="store.isConnected || store.isConnecting"
             >
               Connect
             </button>
@@ -151,7 +150,7 @@ function tabBtn(t: Tab) {
               type="button"
               class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-50"
               @click="client.disconnect"
-              :disabled="state.status !== 'connected'"
+              :disabled="!store.isConnected"
             >
               Disconnect
             </button>
@@ -173,12 +172,12 @@ function tabBtn(t: Tab) {
             <div
               class="h-105 overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-4 font-mono text-xs leading-snug"
             >
-              <div v-if="state.log.length === 0" class="text-slate-500">
+              <div v-if="store.log.length === 0" class="text-slate-500">
                 No log entries yet.
               </div>
 
               <div
-                v-for="(e, idx) in state.log"
+                v-for="(e, idx) in store.log"
                 :key="idx"
                 class="whitespace-pre-wrap"
               >
@@ -190,18 +189,18 @@ function tabBtn(t: Tab) {
 
           <div v-else-if="tab === 'config'">
             <ConfigEditor
-              :server-config="state.serverConfig"
-              :connected="state.status === 'connected'"
-              :last-error="state.lastError"
+              :server-config="store.serverConfig"
+              :connected="store.isConnected"
+              :last-error="store.lastError ?? undefined"
               @apply="applyConfig"
             />
           </div>
 
           <div v-else>
             <RulesEditor
-              :server-rules="state.serverRules"
-              :connected="state.status === 'connected'"
-              :last-error="state.lastError"
+              :server-rules="store.serverRules"
+              :connected="store.isConnected"
+              :last-error="store.lastError ?? undefined"
               @apply="applyRules"
             />
           </div>
