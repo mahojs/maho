@@ -4,6 +4,8 @@ const TWITCH_IRC_WS = "wss://irc-ws.chat.twitch.tv:443";
 
 export type TwitchIrcOptions = {
   channel: string; // login name (no #)
+  username?: string;
+  token?: string;
   onChatMessage: (ev: ChatMessageEvent) => void;
   onStatus?: (s: string) => void;
 };
@@ -124,6 +126,14 @@ export function connectTwitchIrc(opts: TwitchIrcOptions): {
   const channel = opts.channel.replace(/^#/, "").trim();
   if (!channel) throw new Error("channel is required");
 
+  const hasAuth = !!opts.token && !!opts.username;
+  const nick = hasAuth ? opts.username! : `justinfan${Math.floor(Math.random() * 100000)}`;
+
+  let pass = "SCHMOOPIIE";
+  if (hasAuth) {
+    pass = opts.token!.startsWith("oauth: ") ? opts.token! : `oauth:${opts.token}`;
+  }
+
   function log(s: string) {
     opts.onStatus?.(s);
   }
@@ -134,13 +144,15 @@ export function connectTwitchIrc(opts: TwitchIrcOptions): {
     ws = new WebSocket(TWITCH_IRC_WS);
 
     ws.addEventListener("open", () => {
-      ws?.send("PASS SCHMOOPIIE");
-      ws?.send(`NICK justinfan${Math.floor(Math.random() * 100000)}`);
+      ws?.send(`PASS ${pass}`);
+      ws?.send(`NICK ${nick}`);
       ws?.send(
         "CAP REQ :twitch.tv/tags twitch.tv/commands twitch.tv/membership"
       );
       ws?.send(`JOIN #${channel}`);
-      log(`twitch irc: connected, joined #${channel}`);
+
+      const authMode = hasAuth ? `authenticated as ${nick}` : "anonymous";
+      log(`twitch irc: connected (${authMode}), joined #${channel}`);
     });
 
     ws.addEventListener("message", (ev) => {
@@ -151,6 +163,13 @@ export function connectTwitchIrc(opts: TwitchIrcOptions): {
         if (line.startsWith("PING")) {
           ws?.send("PONG :tmi.twitch.tv");
           continue;
+        }
+
+        if (line === ":tmi.twitch.tv NOTICE * :Login authenticateion failed") {
+          log("login failed");
+          closed = true;
+          ws?.close();
+          return;
         }
 
         // PRIVMSG parse, temp
@@ -211,7 +230,7 @@ export function connectTwitchIrc(opts: TwitchIrcOptions): {
     ws.addEventListener("close", () => {
       if (closed) return;
       log("twitch irc: disconnected, reconnecting…");
-      setTimeout(start, 1000);
+      setTimeout(start, 3000);
     });
 
     ws.addEventListener("error", () => {
