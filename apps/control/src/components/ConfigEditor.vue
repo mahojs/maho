@@ -15,6 +15,8 @@ const emit = defineEmits<{
 
 type Draft = {
   channel: string;
+  twitchUsername: string; // NEW
+  twitchToken: string; // NEW
   seventvUserId: string;
   maxMessages: string;
   lifetimeMs: string;
@@ -28,6 +30,8 @@ type Draft = {
 
 const draft = reactive<Draft>({
   channel: "",
+  twitchUsername: "",
+  twitchToken: "",
   seventvUserId: "",
   maxMessages: "10",
   lifetimeMs: "30000",
@@ -46,6 +50,8 @@ const ui = reactive({
 
 function fromServer(c: DeepReadonly<AppConfig>) {
   draft.channel = c.channel ?? "";
+  draft.twitchUsername = c.twitchUsername ?? "";
+  draft.twitchToken = c.twitchToken ?? "";
   draft.seventvUserId = c.seventvUserId ?? "";
   draft.maxMessages = String(c.maxMessages ?? 10);
   draft.lifetimeMs = String(c.lifetimeMs ?? 30000);
@@ -109,6 +115,8 @@ function onApply() {
   try {
     const next: AppConfig = {
       channel: draft.channel.trim(),
+      twitchUsername: draft.twitchUsername.trim(),
+      twitchToken: draft.twitchToken.trim(),
       seventvUserId: draft.seventvUserId.trim() || undefined,
       maxMessages: parseIntStrict("Max messages", draft.maxMessages),
       lifetimeMs: parseIntStrict("Lifetime (ms)", draft.lifetimeMs),
@@ -152,22 +160,22 @@ function onApply() {
     </p>
 
     <fieldset :disabled="!serverConfig" class="space-y-6">
-      <!-- Basic Settings -->
       <div
         class="space-y-3 rounded-lg border border-slate-100 bg-slate-50/50 p-3"
       >
         <div class="grid gap-3 sm:grid-cols-2">
           <label class="space-y-1">
-            <div class="text-xs text-slate-600">Twitch channel</div>
+            <div class="text-xs text-slate-600">Twitch Channel</div>
             <input
               v-model="draft.channel"
               class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+              placeholder="Channel to join"
               autocomplete="off"
             />
           </label>
 
           <label class="space-y-1">
-            <div class="text-xs text-slate-600">7TV user ID</div>
+            <div class="text-xs text-slate-600">7TV User ID</div>
             <input
               v-model="draft.seventvUserId"
               class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
@@ -175,6 +183,37 @@ function onApply() {
               autocomplete="off"
             />
           </label>
+        </div>
+
+        <div class="rounded-md border border-slate-100 bg-slate-50 p-3">
+          <div class="mb-2 text-xs font-semibold text-slate-800">
+            Authentication
+          </div>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <label class="space-y-1">
+              <div class="text-xs text-slate-600">Username</div>
+              <input
+                v-model="draft.twitchUsername"
+                class="w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                placeholder="justinfan123"
+                autocomplete="off"
+              />
+            </label>
+            <label class="space-y-1">
+              <div class="text-xs text-slate-600">Access Token (oauth:...)</div>
+              <input
+                v-model="draft.twitchToken"
+                type="password"
+                class="w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                placeholder="oauth:xxxxxxxxxx"
+                autocomplete="off"
+              />
+            </label>
+          </div>
+          <div class="mt-2 text-[10px] text-slate-700/80">
+            Leave blank to connect anonymously. Tokens are saved locally in
+            plain text.
+          </div>
         </div>
 
         <div class="grid gap-3 sm:grid-cols-3">
@@ -222,7 +261,6 @@ function onApply() {
         </div>
       </div>
 
-      <!-- Blocklist -->
       <label class="space-y-1 block">
         <div class="text-xs text-slate-600">
           Blocklist (comma or newline separated)
@@ -233,7 +271,6 @@ function onApply() {
         ></textarea>
       </label>
 
-      <!-- Custom CSS Editor -->
       <label class="space-y-1 block">
         <div class="flex items-center justify-between">
           <div class="text-xs font-bold text-slate-700">Custom CSS</div>
@@ -242,7 +279,7 @@ function onApply() {
 
         <textarea
           v-model="draft.customCss"
-          class="min-h-16 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+          class="min-h-32 w-full rounded-md border border-slate-300 bg-slate-800 px-3 py-2 font-mono text-xs text-slate-100 leading-snug outline-none focus:border-blue-500"
           placeholder=".chat-line { background: red; }"
         ></textarea>
       </label>
