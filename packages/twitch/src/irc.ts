@@ -211,6 +211,7 @@ export function connectTwitchIrc(opts: TwitchIrcOptions): {
             login: userLogin,
             displayName,
             roles,
+            badges: [],
           },
           text,
           parts,
