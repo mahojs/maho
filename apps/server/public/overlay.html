@@ -76,6 +76,20 @@
         margin-right: 4px;
       }
 
+      .chat-line__badges {
+        margin-right: 4px;
+        display: inline-block;
+        vertical-align: middle;
+      }
+
+      .chat-badge {
+        display: inline-block;
+        vertical-align: middle;
+        height: 18px;
+        margin-right: 2px;
+        border-radius: 2px;
+      }
+
       .chat-line__part-emote {
         height: 1.2em;
         vertical-align: middle;
@@ -230,6 +244,23 @@
         header.className = "chat-line__header";
 
         if (config.showNames) {
+          // badges
+          const badgesContainer = document.createElement("span");
+          badgesContainer.className = "chat-line__badges";
+
+          if (ev.user.badges && ev.user.badges.length > 0) {
+            ev.user.badges.forEach(b => {
+              const img = document.createElement("img");
+              img.className = "chat-badge";
+              img.src = b.url;
+              img.alt = b.title;
+              img.title = b.title;
+              img.classList.add("chat-badge--" + b.setId); 
+              badgesContainer.appendChild(img);
+            });
+          }
+          header.appendChild(badgesContainer);
+
           const name = document.createElement("span");
           name.className = "chat-line__author";
           name.textContent = ev.user.displayName;
