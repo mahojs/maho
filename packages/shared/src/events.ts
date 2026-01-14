@@ -1,6 +1,13 @@
 export type Platform = "twitch";
 export type UserRole = "broadcaster" | "mod" | "vip" | "sub" | "member";
 
+export type UserBadge = {
+  setId: string;
+  version: string;
+  url: string;
+  title: string;
+}
+
 export type MessagePart =
   | { type: "text"; content: string }
   | { type: "emote"; id: string; name: string; url?: string }
@@ -13,6 +20,7 @@ export type ChatUser = {
   login?: string;
   displayName: string;
   roles: UserRole[];
+  badges: UserBadge[];
 };
 
 export type ChatMessageEvent = {

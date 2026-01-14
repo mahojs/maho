@@ -9,6 +9,13 @@ export const UserRoleSchema = z.enum([
   "member",
 ]);
 
+export const UserBadgeSchema = z.object({
+  setId: z.string(),
+  version: z.string(),
+  url: z.string(),
+  title: z.string(),
+});
+
 export const MessagePartSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("text"), content: z.string() }),
   z.object({
@@ -30,6 +37,7 @@ export const ChatUserSchema = z.object({
     .array(UserRoleSchema)
     .default([])
     .transform((arr) => [...new Set(arr)]),
+  badges: z.array(UserBadgeSchema).default([]),
 });
 
 export const ChatMessageEventSchema = z.object({
