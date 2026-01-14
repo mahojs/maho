@@ -4,9 +4,9 @@ import { createWsHub } from "./wsHub";
 import { handleHttp } from "./routes";
 import { loadOrCreateStateFile, saveStateFile, resolveAppDataPath } from "./store";
 import { loadEmotes } from "./emotes";
+import { loadBadges } from "./badges";
 import { appendEvent } from "./commands";
 import { connectTwitchIrc } from "@maho/twitch";
-import { config } from "node:process";
 
 const PORT = Number(process.env.PORT ?? 3000);
 const SUPPORTED_PROTOCOL: ProtocolVersion = 1;
@@ -27,6 +27,10 @@ let emoteLoadToken = 0;
 
 state.emoteMap = await loadEmotes(state.config);
 
+const initialBadges = await loadBadges(state.config.channel);
+state.badgeMaps.global = initialBadges.globalSet;
+state.badgeMaps.channel = initialBadges.channelSet;
+
 async function persistNow() {
   await saveStateFile(filePath, {
     version: 1,
@@ -36,13 +40,19 @@ async function persistNow() {
 }
 
 const hub = createWsHub(state, SUPPORTED_PROTOCOL, persistNow, {
-  onConfigChanged(next, prev) {
+  async onConfigChanged(next, prev) {
     const needsReconnect =
       next.channel !== prev.channel ||
       next.twitchUsername !== prev.twitchUsername ||
       next.twitchToken !== prev.twitchToken;
 
-    if (needsReconnect) startTwitch(next);
+    if (needsReconnect) {
+      startTwitch(next);
+      if (next.channel !== prev.channel ) {
+        const b = await loadBadges(next.channel);
+        state.badgeMaps.channel = b.channelSet;
+      }
+    }
 
     if (next.seventvUserId !== prev.seventvUserId) {
       console.log("Config changed, reloading emotes...");

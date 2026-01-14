@@ -10,6 +10,7 @@ import {
 } from "@maho/shared";
 import { createRulesEngine, type RulesEngine } from "@maho/rules";
 import { EmoteMap, enrichMessageParts } from "./emotes";
+import { BadgeMap, resolveBadges } from "./badges";
 
 export type State = {
   config: AppConfig;
@@ -17,6 +18,7 @@ export type State = {
   ruleset: Ruleset;
   engine: RulesEngine;
   emoteMap: EmoteMap;
+  badgeMaps: { global: BadgeMap; channel: BadgeMap };
   eventLog: { revision: number; payload: EvaluatedEvent }[];
   eventLogMax: number;
 };
@@ -51,6 +53,7 @@ export function createInitialState(seed?: {
     ruleset,
     engine: createRulesEngine(ruleset),
     emoteMap: new Map(),
+    badgeMaps: { global: new Map(), channel: new Map() },
     eventLog: [],
     eventLogMax: 200,
   };
@@ -124,6 +127,17 @@ export function evaluateEvent(state: State, ev: AppEvent): EvaluatedEvent {
   switch (ev.kind) {
     case "chat.message": {
       let next: ChatMessageEvent = ev;
+
+      const twitchData = next.provider?.twitch as { tags?: Record<string, string> } | undefined;
+      const badgeTag = twitchData?.tags?.["badges"];
+
+      if (badgeTag) {
+        next.user.badges = resolveBadges(
+          badgeTag,
+          state.badgeMaps.global,
+          state.badgeMaps.channel
+        );
+      }
 
       if (isBlocked(next.text, state.config)) {
         return { event: next, actions: [{ type: "suppress" }] };
