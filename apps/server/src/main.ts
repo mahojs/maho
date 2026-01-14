@@ -1,4 +1,4 @@
-import type { ProtocolVersion } from "@maho/shared";
+import type { AppConfig, ProtocolVersion } from "@maho/shared";
 import { createInitialState, evaluateEvent } from "./state";
 import { createWsHub } from "./wsHub";
 import { handleHttp } from "./routes";
@@ -6,6 +6,7 @@ import { loadOrCreateStateFile, saveStateFile, resolveAppDataPath } from "./stor
 import { loadEmotes } from "./emotes";
 import { appendEvent } from "./commands";
 import { connectTwitchIrc } from "@maho/twitch";
+import { config } from "node:process";
 
 const PORT = Number(process.env.PORT ?? 3000);
 const SUPPORTED_PROTOCOL: ProtocolVersion = 1;
@@ -36,7 +37,12 @@ async function persistNow() {
 
 const hub = createWsHub(state, SUPPORTED_PROTOCOL, persistNow, {
   onConfigChanged(next, prev) {
-    if (next.channel !== prev.channel) startTwitch(next.channel);
+    const needsReconnect =
+      next.channel !== prev.channel ||
+      next.twitchUsername !== prev.twitchUsername ||
+      next.twitchToken !== prev.twitchToken;
+
+    if (needsReconnect) startTwitch(next);
 
     if (next.seventvUserId !== prev.seventvUserId) {
       console.log("Config changed, reloading emotes...");
@@ -57,10 +63,12 @@ const hub = createWsHub(state, SUPPORTED_PROTOCOL, persistNow, {
 
 let twitchConn: { close: () => void } | null = null;
 
-function startTwitch(channel: string) {
+function startTwitch(cfg: AppConfig) {
   twitchConn?.close();
   twitchConn = connectTwitchIrc({
-    channel,
+    channel: cfg.channel,
+    username: cfg.twitchUsername || undefined,
+    token: cfg.twitchToken || undefined,
     onStatus: (s) => console.log(s),
     onChatMessage: (ev) => {
       const payload = evaluateEvent(state, ev);
@@ -74,7 +82,7 @@ function startTwitch(channel: string) {
   });
 }
 
-startTwitch(state.config.channel);
+startTwitch(state.config);
 
 Bun.serve({
   port: PORT,
