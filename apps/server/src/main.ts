@@ -2,7 +2,11 @@ import type { AppConfig, ProtocolVersion } from "@maho/shared";
 import { createInitialState, evaluateEvent } from "./state";
 import { createWsHub } from "./wsHub";
 import { handleHttp } from "./routes";
-import { loadOrCreateStateFile, saveStateFile, resolveAppDataPath } from "./store";
+import {
+  loadOrCreateStateFile,
+  saveStateFile,
+  resolveAppDataPath,
+} from "./store";
 import { loadEmotes } from "./emotes";
 import { loadBadges } from "./badges";
 import { appendEvent } from "./commands";
@@ -16,7 +20,7 @@ const DATA_DIR = resolveAppDataPath();
 console.log(`[storage] using data directory: ${DATA_DIR}`);
 
 const { filePath, state: persisted } = await loadOrCreateStateFile({
-  dataDir: DATA_DIR
+  dataDir: DATA_DIR,
 });
 
 const state = createInitialState({
@@ -49,7 +53,7 @@ const hub = createWsHub(state, SUPPORTED_PROTOCOL, persistNow, {
 
     if (needsReconnect) {
       startTwitch(next);
-      if (next.channel !== prev.channel ) {
+      if (next.channel !== prev.channel) {
         const b = await loadBadges(next.channel);
         state.badgeMaps.channel = b.channelSet;
       }
@@ -103,6 +107,22 @@ Bun.serve({
     const url = new URL(req.url);
 
     if (url.pathname === "/ws") {
+      const origin = req.headers.get("origin");
+      if (origin) {
+        try {
+          const originUrl = new URL(origin);
+          if (
+            originUrl.hostname !== "localhost" &&
+            originUrl.hostname !== "127.0.0.1"
+          ) {
+            return new Response("Forbidden", { status: 403 });
+          }
+        } catch {
+          if (origin !== "null") {
+            return new Response("Forbidden", { status: 403 });
+          }
+        }
+      }
       if (server.upgrade(req, { data: {} })) return;
       return new Response("upgrade failed", { status: 400 });
     }
