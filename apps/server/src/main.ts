@@ -9,6 +9,7 @@ import { appendEvent } from "./commands";
 import { connectTwitchIrc } from "@maho/twitch";
 
 const PORT = Number(process.env.PORT ?? 3000);
+const HOST = process.env.HOST ?? "127.0.0.1";
 const SUPPORTED_PROTOCOL: ProtocolVersion = 1;
 
 const DATA_DIR = resolveAppDataPath();
@@ -96,6 +97,7 @@ startTwitch(state.config);
 
 Bun.serve({
   port: PORT,
+  hostname: HOST,
 
   fetch(req, server) {
     const url = new URL(req.url);
@@ -118,8 +120,8 @@ Bun.serve({
   },
 });
 
-console.log(`server:  http://localhost:${PORT}`);
-console.log(`health:  http://localhost:${PORT}/health`);
-console.log(`overlay: http://localhost:${PORT}/overlay`);
-console.log(`control: http://localhost:${PORT}/control`);
+console.log(`server:  http://${HOST}:${PORT}`);
+console.log(`health:  http://${HOST}:${PORT}/health`);
+console.log(`overlay: http://${HOST}:${PORT}/overlay`);
+console.log(`control: http://${HOST}:${PORT}/control`);
 console.log(`state file: ${filePath}`);
