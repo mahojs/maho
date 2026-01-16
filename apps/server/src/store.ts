@@ -105,9 +105,39 @@ export async function loadOrCreateStateFile(opts?: {
   }
 }
 
-export async function saveStateFile(
-  filePath: string,
-  state: PersistedStateV1
-): Promise<void> {
-  await writeFile(filePath, JSON.stringify(state, null, 2), "utf8");
+export function createPersistor(filePath: string, debounceMs = 2000) {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let pending: PersistedStateV1 | null = null;
+
+  const writeNow = async () => {
+    if (!pending) return;
+    const data = JSON.stringify(pending, null, 2);
+    
+    pending = null;
+    timer = null;
+
+    try {
+      await writeFile(filePath, data, "utf8");
+      console.debug(`[store] state saved to ${path.basename(filePath)}`);
+    } catch (e) {
+      console.error(`[store] failed to save state to ${filePath}`, e);
+    }
+  };
+
+  return {
+    schedule(state: PersistedStateV1) {
+      pending = state;
+      if (!timer) {
+        timer = setTimeout(writeNow, debounceMs);
+      }
+    },
+    
+    flush: async () => {
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      await writeNow();
+    }
+  };
 }
