@@ -103,7 +103,7 @@ Bun.serve({
   port: PORT,
   hostname: HOST,
 
-  fetch(req, server) {
+  async fetch(req, server) {
     const url = new URL(req.url);
 
     if (url.pathname === "/ws") {
@@ -127,7 +127,7 @@ Bun.serve({
       return new Response("upgrade failed", { status: 400 });
     }
 
-    const res = handleHttp(req, state, hub, PORT);
+    const res = await handleHttp(req, state, hub, PORT);
     if (res) return res;
 
     return new Response("not found", { status: 404 });
