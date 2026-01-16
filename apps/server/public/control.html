@@ -244,19 +244,24 @@
         let msg;
         try {
           msg = JSON.parse(e.data);
-          if (typeof msg.revision === "number") {
-            if (msg.revision < lastRevision) return;
-            lastRevision = msg.revision;
-          }
         } catch {
-          return log("Bad JSON from server");
+          return;
         }
 
-        if (msg.op === "state" || msg.op === "config:changed") {
-          if (msg.config) {
-            currentConfig = msg.config;
+        if (msg.op === "state") {
+          if (msg.config.rev > lastConfigRev) {
+            lastConfigRev = msg.config.rev;
+            currentConfig = msg.config.data;
             syncUI(currentConfig);
-            log(`Config received (channel: ${currentConfig.channel ?? ""})`);
+          }
+          return;
+        }
+
+        if (msg.op === "config:changed") {
+          if (msg.rev > lastConfigRev) {
+            lastConfigRev = msg.rev;
+            currentConfig = { ...currentConfig, ...msg.patch };
+            syncUI(currentConfig);
           }
           return;
         }
@@ -277,8 +282,8 @@
 
       els.apply.addEventListener("click", () => {
         const next = readUI();
-        ws.send(JSON.stringify({ op: "config:set", config: next }));
-        log("Sent config:set");
+        ws.send(JSON.stringify({ op: "config:patch", patch: next }));
+        log("Sent config:patch");
       });
 
       els.debugSend.addEventListener("click", async () => {
