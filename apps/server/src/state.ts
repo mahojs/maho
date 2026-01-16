@@ -13,14 +13,23 @@ import { EmoteMap, enrichMessageParts } from "./emotes";
 import { BadgeMap, resolveBadges } from "./badges";
 
 export type State = {
+  // config
   config: AppConfig;
-  revision: number;
+  configRevision: number;
+
+  // rules
   ruleset: Ruleset;
+  rulesRevision: number;
   engine: RulesEngine;
+
+  // event
+  eventSequence: number;
+  eventLog: { seq: number; payload: EvaluatedEvent }[];
+  eventLogMax: number;
+
+  // resources
   emoteMap: EmoteMap;
   badgeMaps: { global: BadgeMap; channel: BadgeMap };
-  eventLog: { revision: number; payload: EvaluatedEvent }[];
-  eventLogMax: number;
 };
 
 export function createInitialState(seed?: {
@@ -50,9 +59,11 @@ export function createInitialState(seed?: {
 
   return {
     config,
-    revision: 0,
+    configRevision: 0,
     ruleset,
+    rulesRevision: 0,
     engine: createRulesEngine(ruleset),
+    eventSequence: 0,
     emoteMap: new Map(),
     badgeMaps: { global: new Map(), channel: new Map() },
     eventLog: [],

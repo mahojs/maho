@@ -36,9 +36,6 @@ export function createWsHub(
   const clients = new Set<WS>();
   const roles = new WeakMap<WS, ClientRole>();
 
-  let configCommitToken = 0;
-  let rulesCommitToken = 0;
-
   function requireHello(ws: WS): boolean {
     return typeof roles.get(ws) !== "undefined";
   }
@@ -70,23 +67,6 @@ export function createWsHub(
       if (!requireHello(ws)) continue;
       if (roles.get(ws) === "control") ws.send(s);
     }
-  }
-
-  function commitAndPublish(opts: {
-    isStale: () => boolean;
-    onPersistFail: (e: unknown) => void;
-    onCommitted: () => void;
-  }) {
-    (async () => {
-      try {
-        await persist();
-      } catch (e) {
-        opts.onPersistFail(e);
-        return;
-      }
-      if (opts.isStale()) return;
-      opts.onCommitted();
-    })();
   }
 
   function onOpen(ws: WS) {
@@ -134,12 +114,19 @@ export function createWsHub(
       }
 
       roles.set(ws, msg.role);
+
       send(ws, {
         op: "state",
-        revision: state.revision,
-        config: state.config,
-        rules: state.ruleset,
+        config: {
+          rev: state.configRevision,
+          data: state.config,
+        },
+        rules: {
+          rev: state.rulesRevision,
+          data: state.ruleset,
+        },
       });
+
       if (msg.role === "overlay") {
         send(ws, { op: "replay", events: state.eventLog });
       }
@@ -152,67 +139,74 @@ export function createWsHub(
       return;
     }
 
-    if (msg.op === "config:set") {
+    if (msg.op === "config:patch") {
       if (!requireControl(ws)) {
         send(ws, {
           op: "error",
-          message: "only control clients can set config",
+          message: "only control clients can patch config",
         });
         return;
       }
 
-      const parsed = validateConfig(msg.config);
+      // merge incoming patch with current state
+      const nextCandidate = { ...state.config, ...msg.patch };
+
+      // validate result of merge
+      const parsed = validateConfig(nextCandidate);
       if (!parsed.success) {
         send(ws, {
           op: "error",
-          message: "invalid config",
+          message: "invalid config result",
           details: { issues: parsed.error.issues },
         });
         return;
       }
 
-      const token = ++configCommitToken;
+      // store previous state for rollback on error
       const prev = state.config;
       const next = parsed.data;
 
+      // optimistic update; update memory immediately
       state.config = next;
 
-      commitAndPublish({
-        isStale: () => token !== configCommitToken,
+      // asynchronously persist to disk, optimistic implementation
+      (async () => {
+        try {
+          await persist();
 
-        onPersistFail: (e) => {
-          state.config = prev;
-          const err = String(e);
-
-          send(ws, {
-            op: "error",
-            message: "failed to persist config; change was not applied",
-            details: err,
-          });
-
-          const notice = {
-            op: "control:notice",
-            revision: state.revision,
-            level: "error",
-            message: "failed to persist config; change was not applied",
-            details: err,
-          } as const;
-
-          broadcastToControl(notice, ws);
-        },
-
-        onCommitted: () => {
-          state.revision++;
+          //increment revision and notify on success
+          state.configRevision++;
 
           broadcast({
             op: "config:changed",
-            revision: state.revision,
-            config: state.config,
+            rev: state.configRevision,
+            patch: msg.patch, // Only broadcast what changed
           });
 
           hooks?.onConfigChanged?.(state.config, prev);
-        },
-      });
+        } catch (e) {
+          // revert memory state on failure
+          state.config = prev;
+          const errMessage = String(e);
+
+          send(ws, {
+            op: "error",
+            message: "failed to persist config; change reverted",
+            details: errMessage,
+          });
+
+          broadcastToControl(
+            {
+              op: "control:notice",
+              rev: state.configRevision,
+              level: "error",
+              message: "Config save failed",
+              details: errMessage,
+            },
+            ws
+          );
+        }
+      })();
 
       return;
     }
@@ -236,46 +230,44 @@ export function createWsHub(
         return;
       }
 
-      const token = ++rulesCommitToken;
       const prev = state.ruleset;
       const next = parsed.data;
 
       setRuleset(state, next);
 
-      commitAndPublish({
-        isStale: () => token !== rulesCommitToken,
+      (async () => {
+        try {
+          await persist();
 
-        onPersistFail: (e) => {
-          setRuleset(state, prev);
-          const err = String(e);
-
-          send(ws, {
-            op: "error",
-            message: "failed to persist rules; change was not applied",
-            details: err,
-          });
-
-          const notice = {
-            op: "control:notice",
-            revision: state.revision,
-            level: "error",
-            message: "failed to persist rules; change was not applied",
-            details: err,
-          } as const;
-
-          broadcastToControl(notice, ws);
-        },
-
-        onCommitted: () => {
-          state.revision++;
+          state.rulesRevision++;
 
           broadcast({
             op: "rules:changed",
-            revision: state.revision,
+            rev: state.rulesRevision,
             rules: state.ruleset,
           });
-        },
-      });
+        } catch (e) {
+          setRuleset(state, prev);
+          const errMessage = String(e);
+
+          send(ws, {
+            op: "error",
+            message: "failed to persist rules; change reverted",
+            details: errMessage,
+          });
+
+          broadcastToControl(
+            {
+              op: "control:notice",
+              rev: state.rulesRevision,
+              level: "error",
+              message: "failed to persist rules; change reverted",
+              details: errMessage,
+            },
+            ws
+          );
+        }
+      })();
 
       return;
     }

@@ -4,22 +4,16 @@ import type {
   EvaluatedEvent,
   AppEvent,
 } from "@maho/shared";
-import { setRuleset, type State } from "./state";
-import { evaluateEvent } from "./state"; // move evaluateEvent somewhere else later
+import { setRuleset, type State, evaluateEvent } from "./state";
 
 export type EventLogEntry = { revision: number; payload: EvaluatedEvent };
-
-function bumpRevision(state: State): number {
-  state.revision++;
-  return state.revision;
-}
 
 export function appendEvent(
   state: State,
   payload: EvaluatedEvent
 ): EventLogEntry {
-  const revision = bumpRevision(state);
-  const entry = { revision, payload };
+  state.eventSequence++;
+  const entry = { seq: state.eventSequence, payload };
 
   state.eventLog.push(entry);
   if (state.eventLog.length > state.eventLogMax) {

@@ -90,7 +90,7 @@ function startTwitch(cfg: AppConfig) {
       const entry = appendEvent(state, payload);
       hub.broadcast({
         op: "event",
-        revision: entry.revision,
+        seq: entry.seq,
         payload: entry.payload,
       });
     },
