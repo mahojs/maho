@@ -73,6 +73,7 @@ export async function handleHttp(
           displayName: "Tester",
           login: "tester",
           roles: [],
+          badges: [],
         },
         text,
         parts,
