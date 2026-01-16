@@ -1,5 +1,6 @@
 export type AppConfig = {
   channel: string;
+  apiKey?: string;
   twitchUsername?: string;
   twitchToken?: string;
   seventvUserId?: string;

@@ -115,6 +115,15 @@ export function createWsHub(
         return;
       }
 
+      if (msg.role === "control") {
+        if (state.config.apiKey && msg.apiKey !== state.config.apiKey) {
+          console.warn(`rejected connection; invalid api key`);
+          send(ws, { op: "error", message: "invalid api key" });
+          ws.close(4003, "forbidden");
+          return;
+        }
+      }
+
       if (msg.protocolVersion !== supportedProtocol) {
         send(ws, {
           op: "error",

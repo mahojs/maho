@@ -4,6 +4,7 @@ export const AppConfigSchema = z.object({
   channel: z.string().min(1),
   
   // auth fields
+  apiKey: z.string().optional(),
   twitchUsername: z.string().optional(),
   twitchToken: z.string().optional(),
 

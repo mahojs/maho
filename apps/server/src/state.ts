@@ -31,6 +31,7 @@ export function createInitialState(seed?: {
     seed?.config ??
     AppConfigSchema.parse({
       channel: "test",
+      apiKey: crypto.randomUUID(),
       maxMessages: 10,
       disappear: true,
       lifetimeMs: 30000,

@@ -10,6 +10,7 @@ export type ClientHello = {
   op: "hello";
   role: ClientRole;
   protocolVersion: ProtocolVersion;
+  apiKey?: string;
 };
 
 export type ConfigSet = { op: "config:set"; config: AppConfig };
