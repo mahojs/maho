@@ -6,7 +6,7 @@ import type {
 } from "@maho/shared";
 import { setRuleset, type State, evaluateEvent } from "./state";
 
-export type EventLogEntry = { revision: number; payload: EvaluatedEvent };
+export type EventLogEntry = { seq: number; payload: EvaluatedEvent };
 
 export function appendEvent(
   state: State,
