@@ -1,5 +1,5 @@
 import type {
-  AppConfig,
+  ConfigPatch,
   Ruleset,
   ClientToServer,
   ServerToClient,
@@ -35,31 +35,31 @@ export function useControlConnection(opts?: {
   function handleMessage(msg: ServerToClient) {
     switch (msg.op) {
       case "state": {
-        store.updateState(msg.revision, msg.config, msg.rules);
+        store.updateState(msg.config, msg.rules);
         log({
           kind: "info",
           ts: now(),
-          message: `state received (rev ${msg.revision})`,
+          message: `state received (cfg:${msg.config.rev} rules:${msg.rules.rev})`,
         });
         return;
       }
 
       case "config:changed": {
-        store.updateConfig(msg.revision, msg.config);
+        store.updateConfig(msg.rev, msg.patch);
         log({
           kind: "info",
           ts: now(),
-          message: `config updated (rev ${msg.revision})`,
+          message: `config patched (rev ${msg.rev})`,
         });
         return;
       }
 
       case "rules:changed": {
-        store.updateRules(msg.revision, msg.rules);
+        store.updateRules(msg.rev, msg.rules);
         log({
           kind: "info",
           ts: now(),
-          message: `rules updated (rev ${msg.revision})`,
+          message: `rules updated (rev ${msg.rev})`,
         });
         return;
       }
@@ -68,7 +68,7 @@ export function useControlConnection(opts?: {
         log({
           kind: "notice",
           ts: now(),
-          revision: msg.revision,
+          revision: msg.rev,
           level: msg.level,
           message: msg.message,
           details: msg.details,
@@ -180,8 +180,8 @@ export function useControlConnection(opts?: {
     ws.send(JSON.stringify(msg));
   }
 
-  function setConfig(config: AppConfig) {
-    sendMsg({ op: "config:set", config });
+  function setConfig(patch: ConfigPatch) {
+    sendMsg({ op: "config:patch", patch });
   }
 
   function setRules(rules: Ruleset) {

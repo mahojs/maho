@@ -90,8 +90,11 @@ function tabBtn(t: Tab) {
           >
             {{ status.label }}
           </span>
-          <span v-if="store.revision >= 0" class="font-mono"
-            >rev {{ store.revision }}</span
+          <span v-if="store.configRevision >= 0" class="font-mono"
+            >C:{{ store.configRevision }}</span
+          >
+          <span v-if="store.rulesRevision >= 0" class="font-mono"
+            >R:{{ store.rulesRevision }}</span
           >
           <span v-if="store.serverConfig?.channel" class="font-mono"
             >#{{ store.serverConfig.channel }}</span

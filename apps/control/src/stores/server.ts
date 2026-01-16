@@ -37,7 +37,9 @@ export const useServerStore = defineStore("server", {
     status: "idle" as WsStatus,
     lastError: undefined as string | undefined,
 
-    revision: -1,
+    configRevision: -1,
+    rulesRevision: -1,
+
     serverConfig: null as AppConfig | null,
     serverRules: null as Ruleset | null,
 
@@ -63,26 +65,33 @@ export const useServerStore = defineStore("server", {
       this.lastError = undefined;
     },
 
-    updateState(revision: number, config: AppConfig, rules: Ruleset) {
-      if (revision < this.revision) return;
-      this.revision = revision;
-      this.serverConfig = config;
-      this.serverRules = rules;
+    updateState(
+      config: { rev: number; data: AppConfig },
+      rules: { rev: number; data: Ruleset }
+    ) {
+      if (config.rev >= this.configRevision) {
+        this.configRevision = config.rev;
+        this.serverConfig = config.data;
+      }
+      if (rules.rev >= this.rulesRevision) {
+        this.rulesRevision = rules.rev;
+        this.serverRules = rules.data;
+      }
       this.lastError = undefined;
     },
 
-    updateConfig(revision: number, config: AppConfig) {
-      if (revision < this.revision) return;
-      this.revision = revision;
-      this.serverConfig = config;
-      this.lastError = undefined;
+    updateConfig(rev: number, patch: Partial<AppConfig>) {
+      if (rev < this.configRevision) return;
+      this.configRevision = rev;
+      if (this.serverConfig) {
+        this.serverConfig = { ...this.serverConfig, ...patch };
+      }
     },
 
-    updateRules(revision: number, rules: Ruleset) {
-      if (revision < this.revision) return;
-      this.revision = revision;
+    updateRules(rev: number, rules: Ruleset) {
+      if (rev < this.rulesRevision) return;
+      this.rulesRevision = rev;
       this.serverRules = rules;
-      this.lastError = undefined;
     },
 
     pushLog(entry: ControlLogEntry) {
