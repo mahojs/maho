@@ -119,6 +119,7 @@ export function useControlConnection(opts?: {
         op: "hello",
         role,
         protocolVersion,
+        apiKey: window.MAHO_API_KEY,
       };
       ws?.send(JSON.stringify(hello));
       store.setStatus("connected");
