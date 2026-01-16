@@ -6,6 +6,8 @@ export type ProtocolVersion = 1;
 
 export type ClientRole = "overlay" | "control";
 
+export type ConfigPatch = Partial<AppConfig>;
+
 export type ClientHello = {
   op: "hello";
   role: ClientRole;
@@ -13,45 +15,50 @@ export type ClientHello = {
   apiKey?: string;
 };
 
-export type ConfigSet = { op: "config:set"; config: AppConfig };
+export type ConfigPatchOp = { op: "config:patch"; patch: ConfigPatch };
 
 export type ConfigChanged = {
   op: "config:changed";
-  revision: number;
-  config: AppConfig;
+  rev: number;
+  patch: ConfigPatch;
 };
 
 export type RulesSet = { op: "rules:set"; rules: Ruleset };
 
 export type RulesChanged = {
   op: "rules:changed";
-  revision: number;
+  rev: number;
   rules: Ruleset;
 };
 
 export type ServerState = {
   op: "state";
-  revision: number;
-  config: AppConfig;
-  rules: Ruleset;
+  config: {
+    rev: number;
+    data: AppConfig;
+  }
+  rules: {
+    rev: number;
+    data: Ruleset;
+  }
 };
 
 export type RuntimeEvent = {
   op: "event";
-  revision: number;
+  seq: number;
   payload: EvaluatedEvent;
 };
 
 export type Replay = {
   op: "replay";
-  events: { revision: number; payload: EvaluatedEvent }[];
+  events: { seq: number; payload: EvaluatedEvent }[];
 };
 
 export type ProtocolError = { op: "error"; message: string; details?: unknown };
 
 export type ControlNotice = {
   op: "control:notice";
-  revision: number;
+  rev?: number; // optional context rev
   level: "info" | "warn" | "error";
   message: string;
   details?: unknown;
@@ -66,4 +73,4 @@ export type ServerToClient =
   | ProtocolError
   | ControlNotice;
 
-export type ClientToServer = ClientHello | ConfigSet | RulesSet;
+export type ClientToServer = ClientHello | ConfigPatchOp | RulesSet;
