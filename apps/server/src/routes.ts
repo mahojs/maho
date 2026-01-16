@@ -14,20 +14,29 @@ function json(data: unknown, status = 200) {
 const PUBLIC_DIR = path.resolve(process.cwd(), "public");
 const CONTROL_DIR = path.join(PUBLIC_DIR, "control");
 
-export function handleHttp(
+export async function handleHttp(
   req: Request,
   state: State,
   hub: WsHub,
   port: number
-): Response | undefined {
+): Promise<Response | undefined> {
   const url = new URL(req.url);
 
   if (url.pathname === "/overlay") {
     return new Response(Bun.file(path.join(PUBLIC_DIR, "overlay.html")));
   }
 
-  if (url.pathname === "/control" || url.pathname === "/control/") {
-    return new Response(Bun.file(path.join(CONTROL_DIR, "index.html")));
+  if (url.pathname === "/control" || url.pathname === "/control/" || url.pathname === "/control/index.html") {
+    const file = Bun.file(path.join(CONTROL_DIR, "index.html"));
+    let html = await file.text();
+
+    // inject key
+    const script = `<script>window.MAHO_API_KEY = "${state.config.apiKey}";</script>`;
+    html = html.replace("</head>", `${script}</head>`);
+  
+    return new Response(html, {
+      headers: { "content-type": "text/html" },
+    });
   }
 
   if (url.pathname.startsWith("/control/")) {
