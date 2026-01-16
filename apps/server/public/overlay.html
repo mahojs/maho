@@ -129,7 +129,9 @@
       const wsProto = location.protocol === "https:" ? "wss:" : "ws:";
       const ws = new WebSocket(`${wsProto}//${location.host}/ws`);
 
-      let lastRevision = -1;
+      let lastEventSeq = -1;
+      let lastConfigRev = -1;
+
       let config = {
         maxMessages: 10,
         lifetimeMs: 10000,
@@ -292,8 +294,11 @@
         queue.add(div);
       }
 
-      function updateConfig(newConfig) {
-        config = { ...config, ...newConfig };
+      function updateConfig(rev, patch) {
+        if (rev < lastConfigRev) return;
+        lastConfigRev = rev;
+        config = { ...config, ...patch }; // merge patch
+
         queue.prune();
         if (typeof config.customCss === "string") {
           styleTag.textContent = config.customCss;
@@ -309,34 +314,34 @@
       ws.addEventListener("message", (e) => {
         const msg = JSON.parse(e.data);
 
-        if (typeof msg.revision === "number") {
-          if (msg.revision < lastRevision) return;
-          lastRevision = msg.revision;
+        if (msg.op === "state") {
+          updateConfig(msg.config.rev, msg.config.data);
+          return;
         }
 
-        if (msg.op === "state" || msg.op === "config:changed") {
-          if (msg.config) updateConfig(msg.config);
+        if (msg.op === "config:changed") {
+          updateConfig(msg.rev, msg.patch);
           return;
         }
 
         if (msg.op === "event") {
+          if (typeof msg.seq === "number") {
+            if (msg.seq <= lastEventSeq) return;
+            lastEventSeq = msg.seq;
+          }
           applyEvent(msg.payload);
           return;
         }
 
         if (msg.op === "replay") {
           queue.reset();
-          lastRevision = -1;
+          lastEventSeq = -1;
 
           msg.events.forEach((e) => {
-            if (typeof e.revision === "number") {
-              if (e.revision < lastRevision) return;
-              lastRevision = e.revision;
-            }
+            if (e.seq <= lastEventSeq) return;
+            lastEventSeq = e.seq;
             applyEvent(e.payload);
           });
-
-          queue.prune();
           return;
         }
       });
