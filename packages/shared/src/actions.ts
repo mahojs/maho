@@ -1,9 +1,7 @@
-import type { AppEvent } from "./events";
+import type { AppEvent } from "./schema/events";
+import type { RenderAction } from "./schema/rules";
 
-export type RenderAction =
-  | { type: "addClass"; value: string }
-  | { type: "setVar"; name: string; value: string }
-  | { type: "suppress" };
+export type { RenderAction };
 
 export type EvaluatedEvent = {
   event: AppEvent;

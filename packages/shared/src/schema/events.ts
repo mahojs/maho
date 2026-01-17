@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 export const PlatformSchema = z.enum(["twitch"]);
+export type Platform = z.infer<typeof PlatformSchema>;
+
 export const UserRoleSchema = z.enum([
   "broadcaster",
   "mod",
@@ -8,6 +10,7 @@ export const UserRoleSchema = z.enum([
   "sub",
   "member",
 ]);
+export type UserRole = z.infer<typeof UserRoleSchema>;
 
 export const UserBadgeSchema = z.object({
   setId: z.string(),
@@ -15,6 +18,7 @@ export const UserBadgeSchema = z.object({
   url: z.string(),
   title: z.string(),
 });
+export type UserBadge = z.infer<typeof UserBadgeSchema>;
 
 export const MessagePartSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("text"), content: z.string() }),
@@ -27,6 +31,7 @@ export const MessagePartSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("mention"), user: z.string() }),
   z.object({ type: z.literal("link"), url: z.string(), text: z.string() }),
 ]);
+export type MessagePart = z.infer<typeof MessagePartSchema>;
 
 export const ChatUserSchema = z.object({
   platform: PlatformSchema,
@@ -39,6 +44,7 @@ export const ChatUserSchema = z.object({
     .transform((arr) => [...new Set(arr)]),
   badges: z.array(UserBadgeSchema).default([]),
 });
+export type ChatUser = z.infer<typeof ChatUserSchema>;
 
 export const ChatMessageEventSchema = z.object({
   kind: z.literal("chat.message"),
@@ -52,7 +58,9 @@ export const ChatMessageEventSchema = z.object({
   parts: z.array(MessagePartSchema).default([]),
   provider: z.unknown().optional(),
 });
+export type ChatMessageEvent = z.infer<typeof ChatMessageEventSchema>;
 
 export const AppEventSchema = z.discriminatedUnion("kind", [
   ChatMessageEventSchema,
 ]);
+export type AppEvent = z.infer<typeof AppEventSchema>;

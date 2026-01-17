@@ -20,6 +20,7 @@ export const RuleMatchSchema = z
         "Rule match must specify at least one condition unless matchAll is true",
     }
   );
+export type RuleMatch = z.infer<typeof RuleMatchSchema>;
 
 export const RenderActionSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("addClass"), value: z.string().min(1) }),
@@ -31,6 +32,7 @@ export const RenderActionSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("suppress") }),
   z.object({ type: z.literal("maskUrl") }),
 ]);
+export type RenderAction = z.infer<typeof RenderActionSchema>;
 
 export const RuleSchema = z.object({
   id: z.string().min(1),
@@ -39,16 +41,15 @@ export const RuleSchema = z.object({
   actions: z.array(RenderActionSchema).default([]),
   cooldownMs: z.number().int().min(0).max(1000000).optional(),
 });
+export type Rule = z.infer<typeof RuleSchema>;
 
 export const RulesetSchema = z.object({
   version: z.literal(1),
   rules: z.array(RuleSchema).default([]),
 });
+export type Ruleset = z.infer<typeof RulesetSchema>;
 
 export const DefaultRuleset = RulesetSchema.parse({
   version: 1,
   rules: [],
 });
-
-export type Rule = z.infer<typeof RuleSchema>;
-export type Ruleset = z.infer<typeof RulesetSchema>;
