@@ -9,14 +9,14 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: "apply", config: AppConfig): void;
+  (e: "apply", patch: Partial<AppConfig>): void;
   (e: "reset"): void;
 }>();
 
 type Draft = {
   channel: string;
-  twitchUsername: string; // NEW
-  twitchToken: string; // NEW
+  twitchUsername: string;
+  twitchToken: string;
   seventvUserId: string;
   maxMessages: string;
   lifetimeMs: string;
@@ -51,7 +51,7 @@ const ui = reactive({
 function fromServer(c: DeepReadonly<AppConfig>) {
   draft.channel = c.channel ?? "";
   draft.twitchUsername = c.twitchUsername ?? "";
-  draft.twitchToken = c.twitchToken ?? "";
+  draft.twitchToken = "";
   draft.seventvUserId = c.seventvUserId ?? "";
   draft.maxMessages = String(c.maxMessages ?? 10);
   draft.lifetimeMs = String(c.lifetimeMs ?? 30000);
@@ -113,25 +113,45 @@ function onApply() {
   if (!props.serverConfig) return;
 
   try {
-    const next: AppConfig = {
-      channel: draft.channel.trim(),
-      twitchUsername: draft.twitchUsername.trim(),
-      twitchToken: draft.twitchToken.trim(),
-      seventvUserId: draft.seventvUserId.trim() || undefined,
-      maxMessages: parseIntStrict("Max messages", draft.maxMessages),
-      lifetimeMs: parseIntStrict("Lifetime (ms)", draft.lifetimeMs),
-      fadeMs: parseIntStrict("Fade (ms)", draft.fadeMs),
-      disappear: !!draft.disappear,
-      showNames: !!draft.showNames,
-      hideLinks: !!draft.hideLinks,
-      blocklist: draft.blocklistText
-        .split(/[,\n]/g)
-        .map((s) => s.trim())
-        .filter(Boolean),
-      customCss: draft.customCss,
-    };
+    const patch: Partial<AppConfig> = {};
+    const s = props.serverConfig;
 
-    emit("apply", next);
+    // diff
+    if (draft.channel.trim() !== s.channel) patch.channel = draft.channel.trim();
+    if (draft.twitchUsername.trim() !== s.twitchUsername) patch.twitchUsername = draft.twitchUsername.trim();
+    if (draft.seventvUserId.trim() !== s.seventvUserId) patch.seventvUserId = draft.seventvUserId.trim();
+    if (draft.customCss !== s.customCss) patch.customCss = draft.customCss;
+
+    if (draft.twitchToken.trim()) {
+      patch.twitchToken = draft.twitchToken.trim();
+    }
+
+    const maxMsg = parseIntStrict("Max messages", draft.maxMessages);
+    if (maxMsg !== s.maxMessages) patch.maxMessages = maxMsg;
+
+    const life = parseIntStrict("Lifetime", draft.lifetimeMs);
+    if (life !== s.lifetimeMs) patch.lifetimeMs = life;
+
+    const fade = parseIntStrict("Fade", draft.fadeMs);
+    if (fade !== s.fadeMs) patch.fadeMs = fade;
+
+    if (draft.disappear !== s.disappear) patch.disappear = !!draft.disappear;
+    if (draft.showNames !== s.showNames) patch.showNames = !!draft.showNames;
+    if (draft.hideLinks !== s.hideLinks) patch.hideLinks = !!draft.hideLinks;
+
+    const nextBlock = draft.blocklistText.split(/[,\n]/g).map((s) => s.trim()).filter(Boolean);
+
+    if (JSON.stringify(nextBlock) !== JSON.stringify(s.blocklist)) {
+      patch.blocklist = nextBlock;
+    }
+
+    // only emit if keys exist
+    if (Object.keys(patch).length > 0) {
+      emit("apply", patch);
+    } else {
+      ui.dirty = false;
+    }
+
   } catch (e) {
     localError.message = e instanceof Error ? e.message : String(e);
   }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import type { AppConfig, Rule, Ruleset } from "@maho/shared";
 import { useControlConnection } from "./lib/ws";
 import { useServerStore, type ControlLogEntry } from "./stores/server";
 import ConfigEditor from "./components/ConfigEditor.vue";
@@ -55,11 +56,11 @@ function formatLogLine(e: ControlLogEntry): string {
   return e.details ? `${base} — ${safeJson(e.details)}` : base;
 }
 
-function applyConfig(next: any) {
-  client.setConfig(next);
+function applyConfig(patch: Partial<AppConfig>) {
+  client.setConfig(patch);
 }
 
-function applyRules(next: any) {
+function applyRules(next: Ruleset) {
   client.setRules(next);
 }
 
