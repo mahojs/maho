@@ -8,6 +8,8 @@ export const AppConfigSchema = z.object({
   twitchUsername: z.string().optional(),
   twitchToken: z.string().optional(),
 
+  hasTwitchToken: z.boolean().optional(),
+
   seventvUserId: z.string().optional(),
   maxMessages: z.number().int().min(1).max(50),
   disappear: z.boolean(),

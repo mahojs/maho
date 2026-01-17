@@ -3,6 +3,7 @@ export type AppConfig = {
   apiKey?: string;
   twitchUsername?: string;
   twitchToken?: string;
+  hasTwitchToken?: boolean;
   seventvUserId?: string;
   maxMessages: number;
   disappear: boolean;

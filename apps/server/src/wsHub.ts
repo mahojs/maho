@@ -8,6 +8,8 @@ import {
   validateConfig,
   validateRuleset,
   setRuleset,
+  sanitizeConfig,
+  sanitizePatch,
   type State,
 } from "./state";
 import type { ServerWebSocket } from "bun";
@@ -110,7 +112,7 @@ export function createWsHub(
         op: "state",
         config: {
           rev: state.configRevision,
-          data: state.config,
+          data: sanitizeConfig(state.config),
         },
         rules: {
           rev: state.rulesRevision,
@@ -163,7 +165,7 @@ export function createWsHub(
       broadcast({
         op: "config:changed",
         rev: state.configRevision,
-        patch: msg.patch,
+        patch: sanitizePatch(msg.patch),
       });
 
       hooks?.onConfigChanged?.(state.config, prev);

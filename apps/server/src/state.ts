@@ -71,6 +71,29 @@ export function createInitialState(seed?: {
   };
 }
 
+export function sanitizeConfig(cfg: AppConfig): AppConfig {
+  const safe = { ...cfg };
+  safe.hasTwitchToken = !!safe.twitchToken;
+
+  delete safe.twitchToken;
+  delete safe.apiKey;
+
+  return safe;
+}
+
+export function sanitizePatch(patch: Partial<AppConfig>): Partial<AppConfig> {
+  const safe = { ...patch };
+
+  if ("twitchToken" in safe) {
+    const val = safe.twitchToken;
+    safe.hasTwitchToken = !!val && val.length > 0;
+    delete safe.twitchToken;
+  }
+  
+  delete safe.apiKey;
+  return safe;
+}
+
 export function validateConfig(input: unknown) {
   return AppConfigSchema.safeParse(input);
 }
@@ -140,7 +163,9 @@ export function evaluateEvent(state: State, ev: AppEvent): EvaluatedEvent {
     case "chat.message": {
       let next: ChatMessageEvent = ev;
 
-      const twitchData = next.provider?.twitch as { tags?: Record<string, string> } | undefined;
+      const twitchData = next.provider?.twitch as
+        | { tags?: Record<string, string> }
+        | undefined;
       const badgeTag = twitchData?.tags?.["badges"];
 
       if (badgeTag) {
