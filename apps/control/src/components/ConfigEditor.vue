@@ -67,10 +67,38 @@ function fromServer(c: DeepReadonly<AppConfig>) {
   ui.hasSnapshot = true;
 }
 
+function isEquivalent(draft: Draft, remote: DeepReadonly<AppConfig>): boolean {
+  try {
+    if (draft.channel.trim() !== remote.channel) return false;
+    if (draft.twitchUsername.trim() !== (remote.twitchUsername || "")) return false;
+    if (draft.seventvUserId.trim() !== (remote.seventvUserId || "")) return false;
+    if (draft.customCss !== remote.customCss) return false;
+
+    if (Number(draft.maxMessages) !== remote.maxMessages) return false;
+    if (Number(draft.lifetimeMs) !== remote.lifetimeMs) return false;
+    if (Number(draft.fadeMs) !== remote.fadeMs) return false;
+
+    if (!!draft.disappear !== remote.disappear) return false;
+    if (!!draft.showNames !== remote.showNames) return false;
+    if (!!draft.hideLinks !== remote.hideLinks) return false;
+
+    const localList = draft.blocklistText.split(/[,\n]/g).map(s => s.trim()).filter(Boolean);
+    const remoteList = remote.blocklist ? [...remote.blocklist] : [];
+    if (JSON.stringify(localList) !== JSON.stringify(remoteList)) return false;
+
+    return true; 
+  } catch {
+    return false;
+  }
+}
+
 watch(
   () => props.serverConfig,
   (c) => {
     if (!c) return;
+    if (ui.dirty && isEquivalent(draft, c)) {
+      ui.dirty = false;
+    }
     if (!ui.hasSnapshot) {
       fromServer(c);
       return;

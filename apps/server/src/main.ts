@@ -62,7 +62,7 @@ const hub = createWsHub(state, SUPPORTED_PROTOCOL, scheduleSave, {
     }
 
     if (next.seventvUserId !== prev.seventvUserId) {
-      console.log("Config changed, reloading emotes...");
+      console.log("[emotes] config changed, reloading emotes...");
       const token = ++emoteLoadToken;
 
       loadEmotes(next)
@@ -143,7 +143,7 @@ Bun.serve({
 });
 
 const shutdown = async () => {
-  console.log("\n[server] shutting down...");
+  console.log("[server] shutting down...");
   twitchConn?.close();
   await persistor.flush(); // force write any pending changes
   console.log("[server] state flushed, bye");
