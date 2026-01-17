@@ -4,7 +4,7 @@ import { createWsHub } from "./wsHub";
 import { handleHttp } from "./routes";
 import {
   loadOrCreateStateFile,
-  saveStateFile,
+  createPersistor,
   resolveAppDataPath,
 } from "./store";
 import { loadEmotes } from "./emotes";
@@ -23,6 +23,8 @@ const { filePath, state: persisted } = await loadOrCreateStateFile({
   dataDir: DATA_DIR,
 });
 
+const persistor = createPersistor(filePath);
+
 const state = createInitialState({
   config: persisted.config,
   ruleset: persisted.rules,
@@ -36,15 +38,15 @@ const initialBadges = await loadBadges(state.config.channel);
 state.badgeMaps.global = initialBadges.globalSet;
 state.badgeMaps.channel = initialBadges.channelSet;
 
-async function persistNow() {
-  await saveStateFile(filePath, {
+function scheduleSave() {
+  persistor.schedule({
     version: 1,
     config: state.config,
     rules: state.ruleset,
   });
 }
 
-const hub = createWsHub(state, SUPPORTED_PROTOCOL, persistNow, {
+const hub = createWsHub(state, SUPPORTED_PROTOCOL, scheduleSave, {
   async onConfigChanged(next, prev) {
     const needsReconnect =
       next.channel !== prev.channel ||
@@ -139,6 +141,18 @@ Bun.serve({
     message: hub.onMessage,
   },
 });
+
+const shutdown = async () => {
+  console.log("\n[server] shutting down...");
+  twitchConn?.close();
+  await persistor.flush(); // force write any pending changes
+  console.log("[server] state flushed, bye");
+  process.exit(0);
+};
+
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
+
 
 console.log(`server:  http://${HOST}:${PORT}`);
 console.log(`health:  http://${HOST}:${PORT}/health`);

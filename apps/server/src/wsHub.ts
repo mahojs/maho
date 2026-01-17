@@ -28,7 +28,7 @@ export type WsHub = {
 export function createWsHub(
   state: State,
   supportedProtocol: ProtocolVersion,
-  persist: () => Promise<void>,
+  schedulePersist: () => void,
   hooks?: {
     onConfigChanged?: (next: State["config"], prev: State["config"]) => void;
   }
@@ -57,15 +57,6 @@ export function createWsHub(
     for (const ws of clients) {
       if (!requireHello(ws)) continue;
       ws.send(s);
-    }
-  }
-
-  function broadcastToControl(msg: ServerToClient, except?: WS) {
-    const s = encode(msg);
-    for (const ws of clients) {
-      if (ws === except) continue;
-      if (!requireHello(ws)) continue;
-      if (roles.get(ws) === "control") ws.send(s);
     }
   }
 
@@ -153,6 +144,7 @@ export function createWsHub(
 
       // validate result of merge
       const parsed = validateConfig(nextCandidate);
+
       if (!parsed.success) {
         send(ws, {
           op: "error",
@@ -164,49 +156,18 @@ export function createWsHub(
 
       // store previous state for rollback on error
       const prev = state.config;
-      const next = parsed.data;
 
-      // optimistic update; update memory immediately
-      state.config = next;
+      state.config = parsed.data;
+      state.configRevision++;
 
-      // asynchronously persist to disk, optimistic implementation
-      (async () => {
-        try {
-          await persist();
+      broadcast({
+        op: "config:changed",
+        rev: state.configRevision,
+        patch: msg.patch,
+      });
 
-          //increment revision and notify on success
-          state.configRevision++;
-
-          broadcast({
-            op: "config:changed",
-            rev: state.configRevision,
-            patch: msg.patch, // Only broadcast what changed
-          });
-
-          hooks?.onConfigChanged?.(state.config, prev);
-        } catch (e) {
-          // revert memory state on failure
-          state.config = prev;
-          const errMessage = String(e);
-
-          send(ws, {
-            op: "error",
-            message: "failed to persist config; change reverted",
-            details: errMessage,
-          });
-
-          broadcastToControl(
-            {
-              op: "control:notice",
-              rev: state.configRevision,
-              level: "error",
-              message: "Config save failed",
-              details: errMessage,
-            },
-            ws
-          );
-        }
-      })();
+      hooks?.onConfigChanged?.(state.config, prev);
+      schedulePersist();
 
       return;
     }
@@ -230,44 +191,16 @@ export function createWsHub(
         return;
       }
 
-      const prev = state.ruleset;
-      const next = parsed.data;
+      setRuleset(state, parsed.data);
+      state.rulesRevision++;
 
-      setRuleset(state, next);
+      broadcast({
+        op: "rules:changed",
+        rev: state.rulesRevision,
+        rules: state.ruleset,
+      });
 
-      (async () => {
-        try {
-          await persist();
-
-          state.rulesRevision++;
-
-          broadcast({
-            op: "rules:changed",
-            rev: state.rulesRevision,
-            rules: state.ruleset,
-          });
-        } catch (e) {
-          setRuleset(state, prev);
-          const errMessage = String(e);
-
-          send(ws, {
-            op: "error",
-            message: "failed to persist rules; change reverted",
-            details: errMessage,
-          });
-
-          broadcastToControl(
-            {
-              op: "control:notice",
-              rev: state.rulesRevision,
-              level: "error",
-              message: "failed to persist rules; change reverted",
-              details: errMessage,
-            },
-            ws
-          );
-        }
-      })();
+      schedulePersist();
 
       return;
     }
