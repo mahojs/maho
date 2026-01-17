@@ -112,7 +112,7 @@ export function createPersistor(filePath: string, debounceMs = 2000) {
   const writeNow = async () => {
     if (!pending) return;
     const data = JSON.stringify(pending, null, 2);
-    
+
     pending = null;
     timer = null;
 
@@ -131,13 +131,13 @@ export function createPersistor(filePath: string, debounceMs = 2000) {
         timer = setTimeout(writeNow, debounceMs);
       }
     },
-    
+
     flush: async () => {
       if (timer) {
         clearTimeout(timer);
         timer = null;
       }
       await writeNow();
-    }
+    },
   };
 }

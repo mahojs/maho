@@ -1,3 +1,4 @@
 export * from "./events";
 export * from "./config";
 export * from "./rules";
+export * from "./theme";

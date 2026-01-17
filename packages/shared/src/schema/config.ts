@@ -1,8 +1,9 @@
 import { z } from "zod";
 
 export const AppConfigSchema = z.object({
+  // connection
   channel: z.string().min(1),
-  
+
   // auth fields
   apiKey: z.string().optional(),
   twitchUsername: z.string().optional(),
@@ -10,15 +11,11 @@ export const AppConfigSchema = z.object({
 
   hasTwitchToken: z.boolean().optional(),
 
+  // integrations
   seventvUserId: z.string().optional(),
-  maxMessages: z.number().int().min(1).max(50),
-  disappear: z.boolean(),
-  lifetimeMs: z.number().int().min(1000).max(300000),
-  fadeMs: z.number().int().min(0).max(10000),
-  showNames: z.boolean(),
-  hideLinks: z.boolean(),
-  blocklist: z.array(z.string()).default([]),
-  customCss: z.string().default(""),
+
+  // hard system limit for server memory allocation 
+  maxMessages: z.number().int().min(1).max(100).default(50),
 });
 
 export const DefaultConfig = AppConfigSchema.parse({
@@ -26,12 +23,7 @@ export const DefaultConfig = AppConfigSchema.parse({
   twitchUsername: "",
   twitchToken: "",
   seventvUserId: "",
-  maxMessages: 10,
-  disappear: true,
-  lifetimeMs: 30000,
-  fadeMs: 400,
-  showNames: true,
-  hideLinks: false,
-  blocklist: [],
-  customCss: "",
+  maxMessages: 50,
 });
+
+export type AppConfig = z.infer<typeof AppConfigSchema>;
