@@ -48,7 +48,7 @@ export function createInitialState(seed?: {
     AppConfigSchema.parse({
       channel: "test",
       apiKey: crypto.randomUUID(),
-      maxMessages: 50, // Only infra limit remains
+      maxMessages: 50,
     });
 
   const theme =
@@ -69,7 +69,6 @@ export function createInitialState(seed?: {
     RulesetSchema.parse({
       version: 1,
       rules: [
-        // System Rule: Link Hiding (Disabled by default)
         {
           id: "system-hide-links",
           enabled: false,
@@ -179,7 +178,6 @@ export function evaluateEvent(state: State, ev: AppEvent): EvaluatedEvent {
 
   let next: ChatMessageEvent = ev;
 
-  // 1. Resolve Badges
   const twitchData = (next.provider as Record<string, any> | undefined)?.twitch as
     | { tags?: Record<string, string> }
     | undefined;
@@ -193,7 +191,6 @@ export function evaluateEvent(state: State, ev: AppEvent): EvaluatedEvent {
     );
   }
 
-  // 2. Run Rules Engine
   const actions = state.engine.evaluate(next, Date.now());
 
   let maskLinks = false;
@@ -202,7 +199,6 @@ export function evaluateEvent(state: State, ev: AppEvent): EvaluatedEvent {
     if (a.type === "maskUrl") maskLinks = true;
   }
 
-  // 3. Process Content (Emotes & Links)
   if (next.parts) {
     let processedParts = enrichMessageParts(next.parts, state.emoteMap);
     processedParts = processLinks(processedParts, maskLinks);

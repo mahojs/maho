@@ -1,6 +1,7 @@
 import type {
   ConfigPatch,
   Ruleset,
+  ThemePatch,
   ClientToServer,
   ServerToClient,
   ProtocolVersion,
@@ -35,32 +36,30 @@ export function useControlConnection(opts?: {
   function handleMessage(msg: ServerToClient) {
     switch (msg.op) {
       case "state": {
-        store.updateState(msg.config, msg.rules);
+        store.updateState(msg.config, msg.rules, msg.theme);
         log({
           kind: "info",
-          ts: now(),
-          message: `state received (cfg:${msg.config.rev} rules:${msg.rules.rev})`,
+          ts: Date.now(),
+          message: `state received (C:${msg.config.rev} R:${msg.rules.rev} T:${msg.theme.rev})`,
         });
         return;
       }
 
       case "config:changed": {
         store.updateConfig(msg.rev, msg.patch);
-        log({
-          kind: "info",
-          ts: now(),
-          message: `config patched (rev ${msg.rev})`,
-        });
+        log({ kind: "info", ts: Date.now(), message: `config patched (rev ${msg.rev})` });
         return;
       }
 
       case "rules:changed": {
         store.updateRules(msg.rev, msg.rules);
-        log({
-          kind: "info",
-          ts: now(),
-          message: `rules updated (rev ${msg.rev})`,
-        });
+        log({ kind: "info", ts: Date.now(), message: `rules updated (rev ${msg.rev})` });
+        return;
+      }
+
+      case "theme:changed": {
+        store.updateTheme(msg.rev, msg.patch);
+        log({ kind: "info", ts: Date.now(), message: `theme patched (rev ${msg.rev})` });
         return;
       }
 
@@ -68,7 +67,7 @@ export function useControlConnection(opts?: {
         log({
           kind: "notice",
           ts: now(),
-          revision: msg.rev,
+          rev: msg.rev,
           level: msg.level,
           message: msg.message,
           details: msg.details,
@@ -81,7 +80,7 @@ export function useControlConnection(opts?: {
         log({
           kind: "error",
           ts: now(),
-          revision:
+          rev:
             typeof (msg as any).revision === "number"
               ? (msg as any).revision
               : undefined,
@@ -188,10 +187,15 @@ export function useControlConnection(opts?: {
     sendMsg({ op: "rules:set", rules });
   }
 
+  function setTheme(patch: ThemePatch) {
+    sendMsg({ op: "theme:patch", patch });
+  }
+
   return {
     connect,
     disconnect,
     setConfig,
     setRules,
+    setTheme,
   };
 }

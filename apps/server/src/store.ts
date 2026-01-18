@@ -133,7 +133,7 @@ export async function loadOrCreateStateFile(opts?: {
     }
 
     console.error(`[store] state load failed: ${e.message}. Using defaults.`);
-    // Backup corrupted file?
+    // backup corrupted file?
     return { dataDir, filePath, state: defaults };
   }
 }

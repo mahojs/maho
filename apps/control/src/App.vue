@@ -1,16 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import type { AppConfig, Rule, Ruleset } from "@maho/shared";
 import { useControlConnection } from "./lib/ws";
 import { useServerStore, type ControlLogEntry } from "./stores/server";
 import ConfigEditor from "./components/ConfigEditor.vue";
 import RulesEditor from "./components/RulesEditor.vue";
+import ThemeEditor from "./components/ThemeEditor.vue";
 import logoUrl from "./assets/logo.png";
 
 const store = useServerStore();
 const client = useControlConnection();
 
-type Tab = "console" | "config" | "rules";
+type Tab = "console" | "config" | "theme" | "rules";
 const tab = ref<Tab>("console");
 
 onMounted(() => client.connect());
@@ -56,12 +56,16 @@ function formatLogLine(e: ControlLogEntry): string {
   return e.details ? `${base} — ${safeJson(e.details)}` : base;
 }
 
-function applyConfig(patch: Partial<AppConfig>) {
+function applyConfig(patch: any) {
   client.setConfig(patch);
 }
 
-function applyRules(next: Ruleset) {
+function applyRules(next: any) {
   client.setRules(next);
+}
+
+function applyTheme(patch: any) {
+  client.setTheme(patch);
 }
 
 function tabBtn(t: Tab) {
@@ -94,6 +98,9 @@ function tabBtn(t: Tab) {
           <span v-if="store.configRevision >= 0" class="font-mono"
             >C:{{ store.configRevision }}</span
           >
+          <span v-if="store.themeRevision >= 0" class="font-mono"
+            >T:{{ store.themeRevision }}</span
+          >
           <span v-if="store.rulesRevision >= 0" class="font-mono"
             >R:{{ store.rulesRevision }}</span
           >
@@ -106,7 +113,6 @@ function tabBtn(t: Tab) {
         </div>
       </header>
 
-      <!-- Tabs -->
       <nav
         class="mb-4 flex items-center justify-center gap-6 border-b border-slate-200"
       >
@@ -119,6 +125,9 @@ function tabBtn(t: Tab) {
         </button>
         <button type="button" :class="tabBtn('config')" @click="tab = 'config'">
           Config
+        </button>
+        <button type="button" :class="tabBtn('theme')" @click="tab = 'theme'">
+          Theme
         </button>
         <button type="button" :class="tabBtn('rules')" @click="tab = 'rules'">
           Rules
@@ -197,6 +206,15 @@ function tabBtn(t: Tab) {
               :connected="store.isConnected"
               :last-error="store.lastError ?? undefined"
               @apply="applyConfig"
+            />
+          </div>
+
+          <div v-else-if="tab === 'theme'">
+            <ThemeEditor
+              :server-theme="store.serverTheme"
+              :connected="store.isConnected"
+              :last-error="store.lastError ?? undefined"
+              @apply="applyTheme"
             />
           </div>
 

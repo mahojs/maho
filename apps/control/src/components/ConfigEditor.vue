@@ -19,13 +19,6 @@ type Draft = {
   twitchToken: string;
   seventvUserId: string;
   maxMessages: string;
-  lifetimeMs: string;
-  fadeMs: string;
-  disappear: boolean;
-  showNames: boolean;
-  hideLinks: boolean;
-  blocklistText: string;
-  customCss: string;
 };
 
 const draft = reactive<Draft>({
@@ -33,14 +26,7 @@ const draft = reactive<Draft>({
   twitchUsername: "",
   twitchToken: "",
   seventvUserId: "",
-  maxMessages: "10",
-  lifetimeMs: "30000",
-  fadeMs: "400",
-  disappear: true,
-  showNames: true,
-  hideLinks: false,
-  blocklistText: "",
-  customCss: "",
+  maxMessages: "50",
 });
 
 const ui = reactive({
@@ -51,18 +37,9 @@ const ui = reactive({
 function fromServer(c: DeepReadonly<AppConfig>) {
   draft.channel = c.channel ?? "";
   draft.twitchUsername = c.twitchUsername ?? "";
-  draft.twitchToken = "";
+  draft.twitchToken = ""; // always reset
   draft.seventvUserId = c.seventvUserId ?? "";
-  draft.maxMessages = String(c.maxMessages ?? 10);
-  draft.lifetimeMs = String(c.lifetimeMs ?? 30000);
-  draft.fadeMs = String(c.fadeMs ?? 400);
-  draft.disappear = !!c.disappear;
-  draft.showNames = !!c.showNames;
-  draft.hideLinks = !!c.hideLinks;
-  draft.blocklistText = Array.isArray(c.blocklist)
-    ? c.blocklist.join(", ")
-    : "";
-  draft.customCss = c.customCss ?? "";
+  draft.maxMessages = String(c.maxMessages ?? 50);
   ui.dirty = false;
   ui.hasSnapshot = true;
 }
@@ -70,23 +47,12 @@ function fromServer(c: DeepReadonly<AppConfig>) {
 function isEquivalent(draft: Draft, remote: DeepReadonly<AppConfig>): boolean {
   try {
     if (draft.channel.trim() !== remote.channel) return false;
-    if (draft.twitchUsername.trim() !== (remote.twitchUsername || "")) return false;
-    if (draft.seventvUserId.trim() !== (remote.seventvUserId || "")) return false;
-    if (draft.customCss !== remote.customCss) return false;
-
+    if (draft.twitchUsername.trim() !== (remote.twitchUsername || ""))
+      return false;
+    if (draft.seventvUserId.trim() !== (remote.seventvUserId || ""))
+      return false;
     if (Number(draft.maxMessages) !== remote.maxMessages) return false;
-    if (Number(draft.lifetimeMs) !== remote.lifetimeMs) return false;
-    if (Number(draft.fadeMs) !== remote.fadeMs) return false;
-
-    if (!!draft.disappear !== remote.disappear) return false;
-    if (!!draft.showNames !== remote.showNames) return false;
-    if (!!draft.hideLinks !== remote.hideLinks) return false;
-
-    const localList = draft.blocklistText.split(/[,\n]/g).map(s => s.trim()).filter(Boolean);
-    const remoteList = remote.blocklist ? [...remote.blocklist] : [];
-    if (JSON.stringify(localList) !== JSON.stringify(remoteList)) return false;
-
-    return true; 
+    return true;
   } catch {
     return false;
   }
@@ -99,11 +65,9 @@ watch(
     if (ui.dirty && isEquivalent(draft, c)) {
       ui.dirty = false;
     }
-    if (!ui.hasSnapshot) {
+    if (!ui.hasSnapshot || !ui.dirty) {
       fromServer(c);
-      return;
     }
-    if (!ui.dirty) fromServer(c);
   },
   { immediate: true }
 );
@@ -111,8 +75,7 @@ watch(
 watch(
   () => ({ ...draft }),
   () => {
-    if (!ui.hasSnapshot) return;
-    ui.dirty = true;
+    if (ui.hasSnapshot) ui.dirty = true;
   },
   { deep: true }
 );
@@ -121,8 +84,9 @@ function parseIntStrict(label: string, raw: string): number {
   const s = raw.trim();
   if (s === "") throw new Error(`${label} is required`);
   const n = Number(s);
-  if (!Number.isFinite(n)) throw new Error(`${label} must be a number`);
-  if (!Number.isInteger(n)) throw new Error(`${label} must be an integer`);
+  if (!Number.isFinite(n) || !Number.isInteger(n)) {
+    throw new Error(`${label} must be an integer`);
+  }
   return n;
 }
 
@@ -144,42 +108,22 @@ function onApply() {
     const patch: Partial<AppConfig> = {};
     const s = props.serverConfig;
 
-    // diff
-    if (draft.channel.trim() !== s.channel) patch.channel = draft.channel.trim();
-    if (draft.twitchUsername.trim() !== s.twitchUsername) patch.twitchUsername = draft.twitchUsername.trim();
-    if (draft.seventvUserId.trim() !== s.seventvUserId) patch.seventvUserId = draft.seventvUserId.trim();
-    if (draft.customCss !== s.customCss) patch.customCss = draft.customCss;
-
-    if (draft.twitchToken.trim()) {
-      patch.twitchToken = draft.twitchToken.trim();
-    }
+    if (draft.channel.trim() !== s.channel)
+      patch.channel = draft.channel.trim();
+    if (draft.twitchUsername.trim() !== (s.twitchUsername || ""))
+      patch.twitchUsername = draft.twitchUsername.trim();
+    if (draft.seventvUserId.trim() !== (s.seventvUserId || ""))
+      patch.seventvUserId = draft.seventvUserId.trim();
+    if (draft.twitchToken.trim()) patch.twitchToken = draft.twitchToken.trim();
 
     const maxMsg = parseIntStrict("Max messages", draft.maxMessages);
     if (maxMsg !== s.maxMessages) patch.maxMessages = maxMsg;
 
-    const life = parseIntStrict("Lifetime", draft.lifetimeMs);
-    if (life !== s.lifetimeMs) patch.lifetimeMs = life;
-
-    const fade = parseIntStrict("Fade", draft.fadeMs);
-    if (fade !== s.fadeMs) patch.fadeMs = fade;
-
-    if (draft.disappear !== s.disappear) patch.disappear = !!draft.disappear;
-    if (draft.showNames !== s.showNames) patch.showNames = !!draft.showNames;
-    if (draft.hideLinks !== s.hideLinks) patch.hideLinks = !!draft.hideLinks;
-
-    const nextBlock = draft.blocklistText.split(/[,\n]/g).map((s) => s.trim()).filter(Boolean);
-
-    if (JSON.stringify(nextBlock) !== JSON.stringify(s.blocklist)) {
-      patch.blocklist = nextBlock;
-    }
-
-    // only emit if keys exist
     if (Object.keys(patch).length > 0) {
       emit("apply", patch);
     } else {
       ui.dirty = false;
     }
-
   } catch (e) {
     localError.message = e instanceof Error ? e.message : String(e);
   }
@@ -189,8 +133,9 @@ function onApply() {
 <template>
   <section class="space-y-4">
     <header class="mb-3 flex items-center justify-between gap-3">
-      <h2 class="text-sm font-semibold text-slate-700">Configuration</h2>
-
+      <h2 class="text-sm font-semibold text-slate-700">
+        Infrastructure config
+      </h2>
       <span
         class="rounded-full px-2 py-1 text-xs font-semibold"
         :class="
@@ -213,7 +158,7 @@ function onApply() {
       >
         <div class="grid gap-3 sm:grid-cols-2">
           <label class="space-y-1">
-            <div class="text-xs text-slate-600">Twitch Channel</div>
+            <div class="text-xs text-slate-600">Twitch channel</div>
             <input
               v-model="draft.channel"
               class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
@@ -223,7 +168,7 @@ function onApply() {
           </label>
 
           <label class="space-y-1">
-            <div class="text-xs text-slate-600">7TV User ID</div>
+            <div class="text-xs text-slate-600">7TV user ID</div>
             <input
               v-model="draft.seventvUserId"
               class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
@@ -248,12 +193,16 @@ function onApply() {
               />
             </label>
             <label class="space-y-1">
-              <div class="text-xs text-slate-600">Access Token (oauth:...)</div>
+              <div class="text-xs text-slate-600">Access token (oauth:...)</div>
               <input
                 v-model="draft.twitchToken"
                 type="password"
                 class="w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
-                placeholder="oauth:xxxxxxxxxx"
+                :placeholder="
+                  serverConfig?.hasTwitchToken
+                    ? '•••••••• (Stored)'
+                    : 'oauth:xxxxxxxxxx'
+                "
                 autocomplete="off"
               />
             </label>
@@ -264,75 +213,19 @@ function onApply() {
           </div>
         </div>
 
-        <div class="grid gap-3 sm:grid-cols-3">
-          <label class="space-y-1">
-            <div class="text-xs text-slate-600">Max messages</div>
-            <input
-              v-model="draft.maxMessages"
-              class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
-              inputmode="numeric"
-            />
-          </label>
-
-          <label class="space-y-1">
-            <div class="text-xs text-slate-600">Lifetime (ms)</div>
-            <input
-              v-model="draft.lifetimeMs"
-              class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
-              inputmode="numeric"
-            />
-          </label>
-
-          <label class="space-y-1">
-            <div class="text-xs text-slate-600">Fade (ms)</div>
-            <input
-              v-model="draft.fadeMs"
-              class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
-              inputmode="numeric"
-            />
-          </label>
-        </div>
-
-        <div class="flex flex-wrap gap-4">
-          <label class="flex items-center gap-2 text-xs text-slate-600">
-            <input type="checkbox" v-model="draft.disappear" />
-            Disappear
-          </label>
-          <label class="flex items-center gap-2 text-xs text-slate-600">
-            <input type="checkbox" v-model="draft.showNames" />
-            Show usernames
-          </label>
-          <label class="flex items-center gap-2 text-xs text-slate-600">
-            <input type="checkbox" v-model="draft.hideLinks" />
-            Hide links
-          </label>
-        </div>
+        <label class="space-y-1">
+          <div class="text-xs text-slate-600">
+            Max messages in buffer
+          </div>
+          <input
+            v-model="draft.maxMessages"
+            class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+            inputmode="numeric"
+          />
+        </label>
       </div>
 
-      <label class="space-y-1 block">
-        <div class="text-xs text-slate-600">
-          Blocklist (comma or newline separated)
-        </div>
-        <textarea
-          v-model="draft.blocklistText"
-          class="min-h-16 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
-        ></textarea>
-      </label>
-
-      <label class="space-y-1 block">
-        <div class="flex items-center justify-between">
-          <div class="text-xs font-bold text-slate-700">Custom CSS</div>
-          <div class="text-[10px] text-slate-400">Target .chat-line</div>
-        </div>
-
-        <textarea
-          v-model="draft.customCss"
-          class="min-h-32 w-full rounded-md border border-slate-300 bg-slate-800 px-3 py-2 font-mono text-xs text-slate-100 leading-snug outline-none focus:border-blue-500"
-          placeholder=".chat-line { background: red; }"
-        ></textarea>
-      </label>
-
-      <div class="flex justify-end gap-2 pt-1 border-t border-slate-100 mt-4">
+      <div class="mt-4 flex justify-end gap-2 border-t border-slate-100 pt-4">
         <button
           type="button"
           class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-50"
@@ -348,7 +241,7 @@ function onApply() {
           @click="onApply"
           :disabled="!canApply"
         >
-          Apply
+          Apply config
         </button>
       </div>
 
