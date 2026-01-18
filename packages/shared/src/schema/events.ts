@@ -8,6 +8,7 @@ export const UserRoleSchema = z.enum([
   "mod",
   "vip",
   "sub",
+  "founder",
   "member",
 ]);
 export type UserRole = z.infer<typeof UserRoleSchema>;
@@ -33,6 +34,7 @@ export const MessagePartSchema = z.discriminatedUnion("type", [
 ]);
 export type MessagePart = z.infer<typeof MessagePartSchema>;
 
+// shared user structure for all events
 export const ChatUserSchema = z.object({
   platform: PlatformSchema,
   id: z.string().min(1).optional(),
@@ -45,6 +47,8 @@ export const ChatUserSchema = z.object({
   badges: z.array(UserBadgeSchema).default([]),
 });
 export type ChatUser = z.infer<typeof ChatUserSchema>;
+
+// events
 
 export const ChatMessageEventSchema = z.object({
   kind: z.literal("chat.message"),
@@ -60,7 +64,53 @@ export const ChatMessageEventSchema = z.object({
 });
 export type ChatMessageEvent = z.infer<typeof ChatMessageEventSchema>;
 
+export const TwitchFollowEventSchema = z.object({
+  kind: z.literal("twitch.follow"),
+  id: z.string(),
+  ts: z.number(),
+  user: ChatUserSchema,
+});
+export type TwitchFollowEvent = z.infer<typeof TwitchFollowEventSchema>;
+
+export const TwitchSubEventSchema = z.object({
+  kind: z.literal("twitch.sub"),
+  id: z.string(),
+  ts: z.number(),
+  user: ChatUserSchema,
+  tier: z.string(), // "1000", "2000", "3000", "Prime"
+  isGift: z.boolean(),
+  months: z.number().default(1),
+  streak: z.number().optional(),
+  message: z.string().optional(),
+});
+export type TwitchSubEventSchema = z.infer<typeof TwitchSubEventSchema>;
+
+export const TwitchRaidEventSchema = z.object({
+  kind: z.literal("twitch.raid"),
+  id: z.string(),
+  ts: z.number(),
+  user: ChatUserSchema, // raider
+  viewers: z.number(),
+});
+export type TwitchRaidEvent = z.infer<typeof TwitchRaidEventSchema>;
+
+export const TwitchCheerEventSchema = z.object({
+  kind: z.literal("twitch.cheer"),
+  id: z.string(),
+  ts: z.number(),
+  user: ChatUserSchema,
+  bits: z.number(),
+  message: z.string().optional(),
+});
+export type TwitchCheerEvent = z.infer<typeof TwitchCheerEventSchema>;
+
+// union
+
 export const AppEventSchema = z.discriminatedUnion("kind", [
   ChatMessageEventSchema,
+  TwitchFollowEventSchema,
+  TwitchSubEventSchema,
+  TwitchRaidEventSchema,
+  TwitchCheerEventSchema,
 ]);
 export type AppEvent = z.infer<typeof AppEventSchema>;
