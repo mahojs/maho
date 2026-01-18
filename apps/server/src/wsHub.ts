@@ -27,6 +27,11 @@ export type WsHub = {
   onClose: (ws: WS) => void;
 };
 
+// simple equality check
+function equals(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 export function createWsHub(
   state: State,
   supportedProtocol: ProtocolVersion,
@@ -142,6 +147,11 @@ export function createWsHub(
       // merge incoming patch with current state
       const nextCandidate = { ...state.config, ...msg.patch };
 
+      // check idempotency
+      if (equals(nextCandidate, state.config)) {
+        return;
+      }
+
       // validate result of merge
       const parsed = validateConfig(nextCandidate);
 
@@ -176,12 +186,20 @@ export function createWsHub(
       if (!requireControl(ws)) return;
 
       const nextValues = { ...state.theme.values, ...(msg.patch.values || {}) };
-      state.theme.values = nextValues;
+      const nextTheme = {
+        ...state.theme,
+        values: nextValues,
+      };
 
       if (msg.patch.activeThemeId) {
-        state.theme.activeThemeId = msg.patch.activeThemeId;
+        nextTheme.activeThemeId = msg.patch.activeThemeId;
       }
 
+      if (equals(nextTheme, state.theme)) {
+        return;
+      }
+
+      state.theme = nextTheme;
       state.themeRevision++;
 
       broadcast({
@@ -210,6 +228,10 @@ export function createWsHub(
           message: "invalid ruleset",
           details: { issues: parsed.error.issues },
         });
+        return;
+      }
+
+      if (equals(parsed.data, state.ruleset)) {
         return;
       }
 
