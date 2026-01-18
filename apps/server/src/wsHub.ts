@@ -114,10 +114,8 @@ export function createWsHub(
           rev: state.configRevision,
           data: sanitizeConfig(state.config),
         },
-        rules: {
-          rev: state.rulesRevision,
-          data: state.ruleset,
-        },
+        rules: { rev: state.rulesRevision, data: state.ruleset },
+        theme: { rev: state.themeRevision, data: state.theme },
       });
 
       if (msg.role === "overlay") {
@@ -171,6 +169,28 @@ export function createWsHub(
       hooks?.onConfigChanged?.(state.config, prev);
       schedulePersist();
 
+      return;
+    }
+
+    if (msg.op === "theme:patch") {
+      if (!requireControl(ws)) return;
+
+      const nextValues = { ...state.theme.values, ...(msg.patch.values || {}) };
+      state.theme.values = nextValues;
+
+      if (msg.patch.activeThemeId) {
+        state.theme.activeThemeId = msg.patch.activeThemeId;
+      }
+
+      state.themeRevision++;
+
+      broadcast({
+        op: "theme:changed",
+        rev: state.themeRevision,
+        patch: msg.patch,
+      });
+
+      schedulePersist();
       return;
     }
 

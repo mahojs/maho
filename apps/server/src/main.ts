@@ -43,6 +43,7 @@ function scheduleSave() {
     version: 1,
     config: state.config,
     rules: state.ruleset,
+    theme: state.theme,
   });
 }
 

@@ -1,11 +1,13 @@
 import {
   AppConfigSchema,
   RulesetSchema,
+  ThemeStateSchema,
   type AppConfig,
   type AppEvent,
   type ChatMessageEvent,
   type EvaluatedEvent,
   type Ruleset,
+  type ThemeState,
   type MessagePart,
 } from "@maho/shared";
 import { createRulesEngine, type RulesEngine } from "@maho/rules";
@@ -22,6 +24,10 @@ export type State = {
   rulesRevision: number;
   engine: RulesEngine;
 
+  // themes
+  theme: ThemeState;
+  themeRevision: number;
+
   // event
   eventSequence: number;
   eventLog: { seq: number; payload: EvaluatedEvent }[];
@@ -33,28 +39,44 @@ export type State = {
 };
 
 export function createInitialState(seed?: {
-  config: AppConfig;
-  ruleset: Ruleset;
+  config?: AppConfig;
+  ruleset?: Ruleset;
+  theme?: ThemeState;
 }): State {
   const config =
     seed?.config ??
     AppConfigSchema.parse({
       channel: "test",
       apiKey: crypto.randomUUID(),
-      maxMessages: 10,
-      disappear: true,
-      lifetimeMs: 30000,
-      fadeMs: 400,
-      showNames: true,
-      hideLinks: false,
-      blocklist: [],
+      maxMessages: 50, // Only infra limit remains
+    });
+
+  const theme =
+    seed?.theme ??
+    ThemeStateSchema.parse({
+      activeThemeId: "default",
+      values: {
+        fadeMs: 400,
+        lifetimeMs: 30000,
+        disappear: true,
+        showNames: true,
+        customCss: "",
+      },
     });
 
   const ruleset =
     seed?.ruleset ??
     RulesetSchema.parse({
       version: 1,
-      rules: [],
+      rules: [
+        // System Rule: Link Hiding (Disabled by default)
+        {
+          id: "system-hide-links",
+          enabled: false,
+          match: { kind: "chat.message", textRegex: "(https?://|www\\.)\\S+" },
+          actions: [{ type: "maskUrl" }],
+        },
+      ],
     });
 
   return {
@@ -63,6 +85,8 @@ export function createInitialState(seed?: {
     ruleset,
     rulesRevision: 0,
     engine: createRulesEngine(ruleset),
+    theme,
+    themeRevision: 0,
     eventSequence: 0,
     emoteMap: new Map(),
     badgeMaps: { global: new Map(), channel: new Map() },
@@ -89,13 +113,20 @@ export function sanitizePatch(patch: Partial<AppConfig>): Partial<AppConfig> {
     safe.hasTwitchToken = !!val && val.length > 0;
     delete safe.twitchToken;
   }
-  
+
   delete safe.apiKey;
   return safe;
 }
 
 export function validateConfig(input: unknown) {
   return AppConfigSchema.safeParse(input);
+}
+
+export function validateTheme(input: unknown) {
+  return ThemeStateSchema.safeParse(input);
+}
+export function sanitizeTheme(t: ThemeState) {
+  return t;
 }
 
 export function validateRuleset(input: unknown) {
@@ -107,28 +138,12 @@ export function setRuleset(state: State, ruleset: Ruleset) {
   state.engine = createRulesEngine(ruleset);
 }
 
-function isBlocked(text: string, cfg: AppConfig): boolean {
-  if (!cfg.blocklist.length) return false;
-  const lower = text.toLowerCase();
-  return cfg.blocklist.some((w) => {
-    const s = w.trim();
-    return s.length > 0 && lower.includes(s.toLowerCase());
-  });
-}
-
 function isUrl(s: string): boolean {
   return /^(?:https?:\/\/|www\.)/i.test(s);
 }
 
 function processLinks(parts: MessagePart[], hide: boolean): MessagePart[] {
   const out: MessagePart[] = [];
-  /* 
-  ( ... )           capturing group so .split() includes separators in result array
-  (?: ... )         non-capturing group for the OR logic
-  https?:\/\/       matches http:// or https://
-  |                 OR
-  www\.             matches www. literal
-  [^\s]+            matches one or more non-whitespace characters */
   const urlRegex = /((?:https?:\/\/|www\.)[^\s]+)/g;
 
   for (const part of parts) {
@@ -147,7 +162,6 @@ function processLinks(parts: MessagePart[], hide: boolean): MessagePart[] {
           out.push({ type: "text", content: "[link]" });
         } else {
           const url = token.startsWith("www.") ? `https://${token}` : token;
-
           out.push({ type: "link", url, text: token });
         }
       } else {
@@ -159,38 +173,41 @@ function processLinks(parts: MessagePart[], hide: boolean): MessagePart[] {
 }
 
 export function evaluateEvent(state: State, ev: AppEvent): EvaluatedEvent {
-  switch (ev.kind) {
-    case "chat.message": {
-      let next: ChatMessageEvent = ev;
-
-      const twitchData = next.provider?.twitch as
-        | { tags?: Record<string, string> }
-        | undefined;
-      const badgeTag = twitchData?.tags?.["badges"];
-
-      if (badgeTag) {
-        next.user.badges = resolveBadges(
-          badgeTag,
-          state.badgeMaps.global,
-          state.badgeMaps.channel
-        );
-      }
-
-      if (isBlocked(next.text, state.config)) {
-        return { event: next, actions: [{ type: "suppress" }] };
-      }
-
-      const actions = state.engine.evaluate(next, Date.now());
-
-      if (next.parts) {
-        let processedParts = enrichMessageParts(next.parts, state.emoteMap);
-        processedParts = processLinks(processedParts, state.config.hideLinks);
-        next = { ...next, parts: processedParts };
-      }
-
-      return { event: next, actions };
-    }
-    default:
-      return { event: ev, actions: [] };
+  if (ev.kind !== "chat.message") {
+    return { event: ev, actions: [] };
   }
+
+  let next: ChatMessageEvent = ev;
+
+  // 1. Resolve Badges
+  const twitchData = (next.provider as Record<string, any> | undefined)?.twitch as
+    | { tags?: Record<string, string> }
+    | undefined;
+  const badgeTag = twitchData?.tags?.["badges"];
+
+  if (badgeTag) {
+    next.user.badges = resolveBadges(
+      badgeTag,
+      state.badgeMaps.global,
+      state.badgeMaps.channel
+    );
+  }
+
+  // 2. Run Rules Engine
+  const actions = state.engine.evaluate(next, Date.now());
+
+  let maskLinks = false;
+
+  for (const a of actions) {
+    if (a.type === "maskUrl") maskLinks = true;
+  }
+
+  // 3. Process Content (Emotes & Links)
+  if (next.parts) {
+    let processedParts = enrichMessageParts(next.parts, state.emoteMap);
+    processedParts = processLinks(processedParts, maskLinks);
+    next = { ...next, parts: processedParts };
+  }
+
+  return { event: next, actions };
 }

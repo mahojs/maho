@@ -1,8 +1,10 @@
 import {
   AppConfigSchema,
   RulesetSchema,
+  ThemeStateSchema,
   type AppConfig,
   type Ruleset,
+  type ThemeState,
 } from "@maho/shared";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -12,24 +14,38 @@ export type PersistedStateV1 = {
   version: 1;
   config: AppConfig;
   rules: Ruleset;
+  theme: ThemeState;
 };
 
 export const DEFAULT_PERSISTED_STATE: PersistedStateV1 = {
   version: 1,
   config: {
-    channel: "example_channel",
-    maxMessages: 7,
-    disappear: true,
-    lifetimeMs: 30000,
-    fadeMs: 400,
-    showNames: true,
-    hideLinks: false,
-    blocklist: [],
-    customCss: "",
+    channel: "test",
+    maxMessages: 50,
+    twitchUsername: "",
+    twitchToken: "",
+    seventvUserId: "",
   },
   rules: {
     version: 1,
-    rules: [],
+    rules: [
+      {
+        id: "system-hide-links",
+        enabled: false,
+        match: { kind: "chat.message", textRegex: "(https?://|www\\.)\\S+" },
+        actions: [{ type: "maskUrl" }],
+      },
+    ],
+  },
+  theme: {
+    activeThemeId: "default",
+    values: {
+      fadeMs: 400,
+      lifetimeMs: 30000,
+      disappear: true,
+      showNames: true,
+      customCss: "",
+    },
   },
 };
 
@@ -45,12 +61,12 @@ function parsePersistedStateV1(input: unknown): PersistedStateV1 {
 
   const config = AppConfigSchema.parse(obj.config);
   const rules = RulesetSchema.parse(obj.rules);
+  const theme = ThemeStateSchema.parse(obj.theme);
 
-  return { version: 1, config, rules };
+  return { version: 1, config, rules, theme };
 }
 
 export function resolveAppDataPath(): string {
-  // allow CLI override via env var
   if (process.env.MAHO_DATA_DIR) {
     return process.env.MAHO_DATA_DIR;
   }
@@ -58,7 +74,6 @@ export function resolveAppDataPath(): string {
   const home = os.homedir();
   const platform = os.platform();
 
-  // windows: %APPDATA%/maho
   if (platform === "win32") {
     return path.join(
       process.env.APPDATA ?? path.join(home, "AppData", "Roaming"),
@@ -66,12 +81,10 @@ export function resolveAppDataPath(): string {
     );
   }
 
-  // mac: ~/Library/Application Support/maho
   if (platform === "darwin") {
     return path.join(home, "Library", "Application Support", "maho");
   }
 
-  // linux: ~/.config/maho
   const configHome = process.env.XDG_CONFIG_HOME ?? path.join(home, ".config");
   return path.join(configHome, "maho");
 }
@@ -93,7 +106,25 @@ export async function loadOrCreateStateFile(opts?: {
   try {
     const raw = await readFile(filePath, "utf8");
     const parsed = JSON.parse(raw);
-    const state = parsePersistedStateV1(parsed);
+
+    let state: PersistedStateV1;
+    try {
+      state = parsePersistedStateV1(parsed);
+    } catch {
+      // fallback migration (dev)
+      if (parsed.config && parsed.rules && !parsed.theme) {
+        console.warn("[store] migrating state: adding missing theme lane");
+        state = {
+          version: 1,
+          config: AppConfigSchema.parse(parsed.config),
+          rules: RulesetSchema.parse(parsed.rules),
+          theme: defaults.theme,
+        };
+      } else {
+        throw new Error("state invalid");
+      }
+    }
+
     return { dataDir, filePath, state };
   } catch (e: any) {
     if (e && (e.code === "ENOENT" || e.code === "ENOTDIR")) {
@@ -101,7 +132,9 @@ export async function loadOrCreateStateFile(opts?: {
       return { dataDir, filePath, state: defaults };
     }
 
-    throw new Error(`failed to load ${filePath}: ${String(e)}`);
+    console.error(`[store] state load failed: ${e.message}. Using defaults.`);
+    // Backup corrupted file?
+    return { dataDir, filePath, state: defaults };
   }
 }
 
@@ -113,12 +146,12 @@ export function createPersistor(filePath: string, debounceMs = 2000) {
     if (!pending) return;
     const data = JSON.stringify(pending, null, 2);
 
+    const dataToWrite = pending;
     pending = null;
     timer = null;
 
     try {
       await writeFile(filePath, data, "utf8");
-      console.debug(`[store] state saved to ${path.basename(filePath)}`);
     } catch (e) {
       console.error(`[store] failed to save state to ${filePath}`, e);
     }
