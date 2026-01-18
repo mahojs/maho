@@ -1,4 +1,12 @@
-import type { ChatMessageEvent, MessagePart } from "@maho/shared";
+import type {
+  AppEvent,
+  ChatMessageEvent,
+  TwitchFollowEvent,
+  TwitchSubEventSchema,
+  TwitchRaidEvent,
+  MessagePart,
+  UserRole,
+} from "@maho/shared";
 import { evaluateEvent, type State } from "./state";
 import type { WsHub } from "./wsHub";
 import { appendEvent } from "./commands";
@@ -26,14 +34,18 @@ export async function handleHttp(
     return new Response(Bun.file(path.join(PUBLIC_DIR, "overlay.html")));
   }
 
-  if (url.pathname === "/control" || url.pathname === "/control/" || url.pathname === "/control/index.html") {
+  if (
+    url.pathname === "/control" ||
+    url.pathname === "/control/" ||
+    url.pathname === "/control/index.html"
+  ) {
     const file = Bun.file(path.join(CONTROL_DIR, "index.html"));
     let html = await file.text();
 
     // inject key
     const script = `<script>window.MAHO_API_KEY = "${state.config.apiKey}";</script>`;
     html = html.replace("</head>", `${script}</head>`);
-  
+
     return new Response(html, {
       headers: { "content-type": "text/html" },
     });
@@ -53,32 +65,62 @@ export async function handleHttp(
 
   if (url.pathname === "/dev/fake" && req.method === "POST") {
     return (async () => {
-      const body = (await req.json().catch(() => ({}))) as Record<
-        string,
-        unknown
-      >;
-      const text = String(body.text ?? "pog");
+      const body = (await req.json().catch(() => ({}))) as any;
+      const kind = body.kind || "chat.message";
+      const text = String(body.text ?? "simulation test");
       const platform = "twitch";
+      const id = crypto.randomUUID();
+      const ts = Date.now();
 
-      const parts: MessagePart[] = [{ type: "text", content: text }];
-
-      const ev: ChatMessageEvent = {
-        kind: "chat.message",
-        id: crypto.randomUUID(),
-        ts: Date.now(),
-        platform,
-        channelName: state.config.channel,
-        user: {
-          platform,
-          displayName: "Tester",
-          login: "tester",
-          roles: [],
-          badges: [],
-        },
-        text,
-        parts,
-        provider: { devFake: true },
+      const baseUser = {
+        platform: "twitch" as const,
+        displayName: "TestUser",
+        login: "testuser",
+        roles: ["member" as UserRole],
+        badges: [],
       };
+
+      let ev: AppEvent;
+
+      if (kind === "twitch.follow") {
+        ev = {
+          kind: "twitch.follow",
+          id,
+          ts,
+          user: baseUser,
+        } as TwitchFollowEvent;
+      } else if (kind === "twitch.sub") {
+        ev = {
+          kind: "twitch.sub",
+          id,
+          ts,
+          user: baseUser,
+          tier: "1000",
+          isGift: false,
+          months: 1,
+        } as TwitchSubEventSchema;
+      } else if (kind === "twitch.raid") {
+        ev = {
+          kind: "twitch.raid",
+          id,
+          ts,
+          user: baseUser,
+          viewers: Math.floor(Math.random() * 100) + 1,
+        } as TwitchRaidEvent;
+      } else {
+        const parts: MessagePart[] = [{ type: "text", content: text }];
+        ev = {
+          kind: "chat.message",
+          id,
+          ts,
+          platform,
+          channelName: state.config.channel,
+          user: baseUser,
+          text,
+          parts,
+          provider: { devFake: true },
+        } as ChatMessageEvent;
+      }
 
       const payload = evaluateEvent(state, ev);
       const entry = appendEvent(state, payload);
