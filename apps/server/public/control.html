@@ -129,8 +129,11 @@
           Message text
           <input id="debugText" value="pog" />
         </label>
-        <div style="flex: 0 0 auto; align-self: end">
-          <button id="debugSend" type="button">Simulate message</button>
+        <div style="flex: 0 0 auto; align-self: end; display: flex; gap: 8px">
+          <button id="debugSend" type="button">Chat</button>
+          <button id="debugFollow" type="button">Follow</button>
+          <button id="debugSub" type="button">Sub</button>
+          <button id="debugRaid" type="button">Raid</button>
         </div>
       </div>
     </fieldset>
@@ -159,12 +162,29 @@
         apply: $("apply"),
         debugText: $("debugText"),
         debugSend: $("debugSend"),
+        debugFollow: $("debugFollow"),
+        debugSub: $("debugSub"),
+        debugRaid: $("debugRaid"),
       };
 
       els.url.textContent = `${location.protocol}//${location.host}/overlay`;
 
       let currentConfig = {};
       let lastRevision = -1;
+
+      async function sendFake(kind, text) {
+        try {
+          const res = await fetch("/dev/fake", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ kind, text }),
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          log(`Simulated ${kind}`);
+        } catch (err) {
+          log(`Simulate failed: ${String(err)}`);
+        }
+      }
 
       function log(line) {
         const ts = new Date().toLocaleTimeString();
@@ -286,20 +306,15 @@
         log("Sent config:patch");
       });
 
-      els.debugSend.addEventListener("click", async () => {
+      els.debugSend.addEventListener("click", () => {
         const text = els.debugText.value ?? "";
-        try {
-          const res = await fetch("/dev/fake", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ text }),
-          });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          log(`Simulated: "${text}"`);
-        } catch (err) {
-          log(`Simulate failed: ${String(err)}`);
-        }
+        sendFake("chat.message", text);
       });
+      els.debugFollow.addEventListener("click", () =>
+        sendFake("twitch.follow")
+      );
+      els.debugSub.addEventListener("click", () => sendFake("twitch.sub"));
+      els.debugRaid.addEventListener("click", () => sendFake("twitch.raid"));
     </script>
   </body>
 </html>

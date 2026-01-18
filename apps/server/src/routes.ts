@@ -58,6 +58,12 @@ export async function handleHttp(
     return new Response(Bun.file(filePath));
   }
 
+  if (url.pathname === "/debug") {
+    return new Response(Bun.file(path.join(PUBLIC_DIR, "control.html")), {
+      headers: { "content-type": "text/html" },
+    });
+  }
+
   if (url.pathname === "/health") return new Response("ok");
 
   if (url.pathname === "/dev/state")
