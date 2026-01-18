@@ -10,7 +10,12 @@ import {
 import { loadEmotes } from "./emotes";
 import { loadBadges } from "./badges";
 import { appendEvent } from "./commands";
-import { connectTwitchIrc } from "@maho/twitch";
+import {
+  connectTwitchIrc,
+  validateToken,
+  connectEventSub,
+  type TwitchTokenInfo,
+} from "@maho/twitch";
 
 const PORT = Number(process.env.PORT ?? 3000);
 const HOST = process.env.HOST ?? "127.0.0.1";
@@ -28,6 +33,7 @@ const persistor = createPersistor(filePath);
 const state = createInitialState({
   config: persisted.config,
   ruleset: persisted.rules,
+  theme: persisted.theme,
 });
 
 let emoteLoadToken = 0;
@@ -47,6 +53,74 @@ function scheduleSave() {
   });
 }
 
+// twitch services
+
+let twitchIrc: { close: () => void } | null = null;
+let twitchEventSub: { close: () => void } | null = null;
+
+async function startTwitchServices(cfg: AppConfig) {
+  // shutdown existing
+  twitchIrc?.close();
+  twitchIrc = null;
+  twitchEventSub?.close();
+  twitchEventSub = null;
+
+  // validate identity
+  let identity: TwitchTokenInfo | null = null;
+  if (cfg.twitchToken) {
+    try {
+      identity = await validateToken(cfg.twitchToken);
+      console.log(
+        `[twitch] authenticated as ${identity.login} (client: ${identity.clientId})`
+      );
+    } catch (e: any) {
+      console.error(`[twitch] token validation failed: ${e.message}`);
+    }
+  }
+
+  // irc
+  twitchIrc = connectTwitchIrc({
+    channel: cfg.channel,
+    username: identity?.login || cfg.twitchUsername || undefined,
+    token: cfg.twitchToken || undefined,
+    onStatus: (s) => console.log(s),
+    onChatMessage: (ev) => {
+      const payload = evaluateEvent(state, ev);
+      const entry = appendEvent(state, payload);
+      hub.broadcast({
+        op: "event",
+        seq: entry.seq,
+        payload: entry.payload,
+      });
+    },
+  });
+
+  // eventsub alerts
+  if (identity && cfg.twitchToken) {
+    twitchEventSub = connectEventSub({
+      token: cfg.twitchToken,
+      identity,
+      onStatus: (s) => console.log(s),
+      onError: (e) => console.error(`[eventsub] error:`, e),
+      onEvent: (ev) => {
+        const payload = evaluateEvent(state, ev);
+        const entry = appendEvent(state, payload);
+        hub.broadcast({
+          op: "event",
+          seq: entry.seq,
+          payload: entry.payload,
+        });
+      },
+    });
+  } else {
+    console.log("[eventsub] skipping: no valid token available");
+  }
+}
+
+startTwitchServices(state.config);
+
+// ws hub and config hooks
+
 const hub = createWsHub(state, SUPPORTED_PROTOCOL, scheduleSave, {
   async onConfigChanged(next, prev) {
     const needsReconnect =
@@ -55,7 +129,7 @@ const hub = createWsHub(state, SUPPORTED_PROTOCOL, scheduleSave, {
       next.twitchToken !== prev.twitchToken;
 
     if (needsReconnect) {
-      startTwitch(next);
+      startTwitchServices(next);
       if (next.channel !== prev.channel) {
         const b = await loadBadges(next.channel);
         state.badgeMaps.channel = b.channelSet;
@@ -79,28 +153,7 @@ const hub = createWsHub(state, SUPPORTED_PROTOCOL, scheduleSave, {
   },
 });
 
-let twitchConn: { close: () => void } | null = null;
-
-function startTwitch(cfg: AppConfig) {
-  twitchConn?.close();
-  twitchConn = connectTwitchIrc({
-    channel: cfg.channel,
-    username: cfg.twitchUsername || undefined,
-    token: cfg.twitchToken || undefined,
-    onStatus: (s) => console.log(s),
-    onChatMessage: (ev) => {
-      const payload = evaluateEvent(state, ev);
-      const entry = appendEvent(state, payload);
-      hub.broadcast({
-        op: "event",
-        seq: entry.seq,
-        payload: entry.payload,
-      });
-    },
-  });
-}
-
-startTwitch(state.config);
+// server setup
 
 Bun.serve({
   port: PORT,
@@ -145,7 +198,8 @@ Bun.serve({
 
 const shutdown = async () => {
   console.log("[server] shutting down...");
-  twitchConn?.close();
+  twitchIrc?.close();
+  twitchEventSub?.close();
   await persistor.flush(); // force write any pending changes
   console.log("[server] state flushed, bye");
   process.exit(0);
@@ -153,7 +207,6 @@ const shutdown = async () => {
 
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
-
 
 console.log(`server:  http://${HOST}:${PORT}`);
 console.log(`health:  http://${HOST}:${PORT}/health`);
