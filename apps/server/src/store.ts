@@ -45,6 +45,18 @@ export const DEFAULT_PERSISTED_STATE: PersistedStateV1 = {
       disappear: true,
       showNames: true,
       customCss: "",
+      locales: {
+        "alert.follow.title": "New follower",
+        "alert.sub.title": "New subscriber",
+        "alert.sub.gift_title": "Gift subscription",
+        "alert.sub.details": "Tier {tier}, {months} months",
+        "alert.raid.title": "Incoming raid",
+        "alert.cheer.title": "Cheer",
+        "chat.moderation.deleted": "Message deleted",
+        "chat.placeholder.link": "[link]",
+        "ui.viewers": "{count} viewers",
+        "ui.bits": "{bits} bits",
+      },
     },
   },
 };
