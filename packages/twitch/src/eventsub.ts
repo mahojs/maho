@@ -88,6 +88,11 @@ export function connectEventSub(opts: EventSubOptions) {
         condition: { broadcaster_user_id: broadcasterId },
       },
       {
+        type: "channel.subscription.message",
+        version: "1",
+        condition: { broadcaster_user_id: broadcasterId },
+      },
+      {
         type: "channel.raid",
         version: "1",
         condition: { to_broadcaster_user_id: broadcasterId },
@@ -140,16 +145,21 @@ export function connectEventSub(opts: EventSubOptions) {
         return;
       }
 
-      if (type === "channel.subscribe") {
+      if (
+        type === "channel.subscribe" ||
+        type === "channel.subscription.message"
+      ) {
+        const isResub = type === "channel.subscription.message";
         const ev: TwitchSubEventSchema = {
           kind: "twitch.sub",
           id,
           ts,
           user: baseUser(data.user_name, data.user_login, data.user_id),
           tier: data.tier,
-          isGift: data.is_gift,
-          months: 1,
-          streak: undefined,
+          isGift: isResub ? false : (data.is_gift ?? false),
+          months: isResub ? (data.cumulative_months ?? 1) : 1,
+          streak: isResub ? (data.streak_months ?? undefined) : undefined,
+          message: isResub ? (data.message?.text ?? undefined) : undefined,
         };
         opts.onEvent(ev);
         return;
@@ -231,7 +241,7 @@ export function connectEventSub(opts: EventSubOptions) {
         return;
       }
 
-      // TODO: handling reconnect URL/session_reconnect; currently we let connection die and auto-reconnect via close handler
+      // TODO: handling reconnect URL/session_reconnect as we let connection die and auto-reconnect via close handler
     });
 
     ws.addEventListener("close", () => {

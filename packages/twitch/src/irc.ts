@@ -7,6 +7,9 @@ export type TwitchIrcOptions = {
   username?: string;
   token?: string;
   onChatMessage: (ev: ChatMessageEvent) => void;
+  onMessageDeleted?: (msgId: string) => void;
+  onUserTimedOut?: (ev: { login: string; duration?: number }) => void;
+  onChatCleared?: () => void;
   onStatus?: (s: string) => void;
 };
 
@@ -49,6 +52,8 @@ function rolesFromTags(
   if (badges.split(",").some((b) => b.startsWith("vip/"))) roles.push("vip");
   if (badges.split(",").some((b) => b.startsWith("subscriber/")))
     roles.push("sub");
+  if (badges.split(",").some((b) => b.startsWith("founder/")))
+    roles.push("founder");
   return [...new Set(roles)];
 }
 
@@ -165,66 +170,64 @@ export function connectTwitchIrc(opts: TwitchIrcOptions): {
           continue;
         }
 
-        if (line === ":tmi.twitch.tv NOTICE * :Login authenticateion failed") {
-          log("login failed");
-          closed = true;
-          ws?.close();
-          return;
+        const tagMatch = line.match(/^@([^ ]+)/);
+        const tags = parseTags(tagMatch ? tagMatch[1] : undefined);
+        const trailing = line.includes(" :") ? line.split(" :")[1] : "";
+
+        if (line.includes(" PRIVMSG ")) {
+          const m = line.match(/^(?:@\S+\s)?:(\S+)!.*PRIVMSG\s#(\S+)\s:(.*)$/);
+          if (!m) continue;
+          const userLogin = m[1].toLowerCase();
+          const { text: actionText, isAction } = unwrapCtcpAction(m[3]);
+          const text = sanitizeText(actionText);
+          const id = tags.get("id") || crypto.randomUUID();
+          const roles = rolesFromTags(tags, channel, userLogin);
+          let parts = parseMessageParts(actionText, tags.get("emotes"));
+
+          opts.onChatMessage({
+            kind: "chat.message",
+            id,
+            ts: Date.now(),
+            platform: "twitch",
+            channelName: channel,
+            user: {
+              platform: "twitch",
+              id: tags.get("user-id"),
+              login: userLogin,
+              displayName: tags.get("display-name") || userLogin,
+              roles,
+              badges: [],
+            },
+            text,
+            parts: parts.map((p) =>
+              p.type === "text" ? { ...p, content: sanitizeText(p.content) } : p
+            ),
+            provider: {
+              twitch: { isAction, tags: Object.fromEntries(tags), raw: line },
+            },
+          });
+          continue;
         }
 
-        // PRIVMSG parse, temp
-        const m = line.match(/^(?:@([^ ]+)\s)?:(\S+)\sPRIVMSG\s#(\S+)\s:(.*)$/);
-        if (!m) continue;
+        if (line.includes(" CLEARMSG ")) {
+          const targetId = tags.get("target-msg-id");
+          if (targetId) opts.onMessageDeleted?.(targetId);
+          continue;
+        }
 
-        const tagsPart = m[1];
-        const prefix = m[2] ?? "";
-        const chan = m[3] ?? channel;
-        const rawText = m[4] ?? "";
-        const { text: actionText, isAction } = unwrapCtcpAction(rawText);
-        const text = sanitizeText(actionText);
-
-        const userLogin = (prefix.split("!")[0] || "unknown").toLowerCase();
-        const tags = parseTags(tagsPart);
-
-        const id = tags.get("id") || crypto.randomUUID();
-        const displayName = tags.get("display-name") || userLogin;
-
-        const roles = rolesFromTags(tags, chan, userLogin);
-
-        let parts = parseMessageParts(actionText, tags.get("emotes"));
-        parts = parts.map((p) => {
-          if (p.type === "text") {
-            return { ...p, content: sanitizeText(p.content) };
+        if (line.includes(" CLEARCHAT ")) {
+          const userLogin = trailing.toLowerCase();
+          if (userLogin) {
+            const duration = tags.get("ban-duration");
+            opts.onUserTimedOut?.({
+              login: userLogin,
+              duration: duration ? parseInt(duration, 10) : undefined,
+            });
+          } else {
+            opts.onChatCleared?.();
           }
-          return p;
-        });
-
-        const msgEvent: ChatMessageEvent = {
-          kind: "chat.message",
-          id,
-          ts: Date.now(),
-          platform: "twitch",
-          channelName: chan,
-          user: {
-            platform: "twitch",
-            id: tags.get("user-id") || undefined,
-            login: userLogin,
-            displayName,
-            roles,
-            badges: [],
-          },
-          text,
-          parts,
-          provider: {
-            twitch: {
-              isAction,
-              tags: Object.fromEntries(tags.entries()),
-              raw: line,
-            },
-          },
-        };
-
-        opts.onChatMessage(msgEvent);
+          continue;
+        }
       }
     });
 
