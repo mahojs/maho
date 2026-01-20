@@ -58,6 +58,14 @@ export type RuntimeEvent = {
   payload: EvaluatedEvent;
 };
 
+export type EventUpdate = {
+  op: "event:update";
+  id: string;
+  patch: {
+    isDeleted?: boolean;
+  };
+};
+
 export type Replay = {
   op: "replay";
   events: { seq: number; payload: EvaluatedEvent }[];
@@ -79,6 +87,7 @@ export type ServerToClient =
   | RulesChanged
   | ThemeChanged
   | RuntimeEvent
+  | EventUpdate
   | Replay
   | ProtocolError
   | ControlNotice;
