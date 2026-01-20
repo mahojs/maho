@@ -83,7 +83,7 @@ export const TwitchSubEventSchema = z.object({
   streak: z.number().optional(),
   message: z.string().optional(),
 });
-export type TwitchSubEventSchema = z.infer<typeof TwitchSubEventSchema>;
+export type TwitchSubEvent = z.infer<typeof TwitchSubEventSchema>;
 
 export const TwitchRaidEventSchema = z.object({
   kind: z.literal("twitch.raid"),
