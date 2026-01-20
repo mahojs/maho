@@ -206,20 +206,25 @@
         if (p.type === "emote") {
           const img = document.createElement("img");
           img.className = "chat-message__part-emote";
-          img.src = p.url || `https://static-cdn.jtvnw.net/emoticons/v2/${p.id}/default/dark/1.0`;
+          img.src =
+            p.url ||
+            `https://static-cdn.jtvnw.net/emoticons/v2/${p.id}/default/dark/1.0`;
           return img;
         }
         if (p.type === "mention") {
           const span = document.createElement("span");
           span.className = "chat-message__part-mention";
-          span.textContent = "@" + p.user;
+          span.textContent = p.user.startsWith("@") ? p.user : "@" + p.user;
           return span;
         }
         if (p.type === "link") {
-          const span = document.createElement("span");
-          span.className = "chat-message__part-link";
-          span.textContent = "[link]";
-          return span;
+          const a = document.createElement("a");
+          a.className = "chat-message__part-link";
+          a.href = p.url;
+          a.target = "_blank";
+          a.rel = "noopener noreferrer";
+          a.textContent = p.text || p.url;
+          return a;
         }
         return document.createTextNode("");
       }
