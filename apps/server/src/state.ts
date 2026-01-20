@@ -97,15 +97,18 @@ function t(
   vars: Record<string, any> = {}
 ): MessagePart[] {
   let template = locales[key] || key;
-  // handle pluralization
-  if (template.includes("|") && typeof vars.count === "number") {
+
+  const numericValue = vars.count ?? vars.months ?? vars.bits ?? vars.viewers;
+
+  if (template.includes("|") && typeof numericValue === "number") {
     const [plural, singular] = template.split("|");
-    template = vars.count === 1 ? singular : plural;
+    template = numericValue === 1 ? singular : plural;
   }
 
   for (const [k, v] of Object.entries(vars)) {
-    template = template.replace(`{${k}}`, String(v));
+    template = template.replaceAll(`{${k}}`, String(v));
   }
+
   return [{ type: "text", content: template }];
 }
 
@@ -160,35 +163,32 @@ function getPresentation(ev: AppEvent, theme: ThemeState): PresentationPayload {
       };
 
     case "twitch.sub":
-      const subLayers: RenderLayer[] = [
-        {
-          id: "title",
-          parts: t(l, ev.isGift ? "alert.sub.gift_title" : "alert.sub.title"),
-        },
-        {
-          id: "message",
-          parts: [{ type: "text", content: user }],
-        },
-        {
-          id: "details",
-          parts: t(l, "alert.sub.details", {
-            tier: ev.tier,
-            months: String(ev.months),
-          }),
-        },
-      ];
-
-      if (ev.message) {
-        subLayers.push({
-          id: "content",
-          parts: [{ type: "text", content: ev.message }],
-        });
-      }
-
       return {
         layout: "alert",
         styleHint: "twitch-sub",
-        layers: subLayers,
+        layers: [
+          {
+            id: "title",
+            parts: t(l, ev.isGift ? "alert.sub.gift_title" : "alert.sub.title"),
+          },
+          {
+            id: "message",
+            parts: [{ type: "text", content: user }],
+          },
+          {
+            id: "details",
+            parts: t(l, "alert.sub.details", {
+              tier: ev.tier,
+              months: ev.months,
+            }),
+          },
+          ev.message
+            ? {
+                id: "content",
+                parts: [{ type: "text", content: ev.message }],
+              }
+            : null,
+        ].filter((layer): layer is RenderLayer => layer !== null),
       };
 
     case "twitch.raid":
@@ -198,10 +198,7 @@ function getPresentation(ev: AppEvent, theme: ThemeState): PresentationPayload {
         layers: [
           { id: "title", parts: t(l, "alert.raid.title") },
           { id: "message", parts: [{ type: "text", content: user }] },
-          {
-            id: "details",
-            parts: t(l, "ui.viewers", { count: String(ev.viewers) }),
-          },
+          { id: "details", parts: t(l, "ui.viewers", { viewers: ev.viewers }) },
         ],
       };
 

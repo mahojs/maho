@@ -10,6 +10,7 @@ import {
   setRuleset,
   sanitizeConfig,
   sanitizePatch,
+  evaluateEvent,
   type State,
 } from "./state";
 import type { ServerWebSocket } from "bun";
@@ -202,10 +203,21 @@ export function createWsHub(
       state.theme = nextTheme;
       state.themeRevision++;
 
+      state.eventLog.forEach((entry) => {
+        const reEvaluated = evaluateEvent(state, entry.payload.event);
+        entry.payload.presentation = reEvaluated.presentation;
+      });
+
       broadcast({
         op: "theme:changed",
         rev: state.themeRevision,
         patch: msg.patch,
+      });
+
+      // redraw existing
+      broadcast({
+        op: "replay",
+        events: state.eventLog,
       });
 
       schedulePersist();
