@@ -139,6 +139,23 @@ function getPresentation(ev: AppEvent, theme: ThemeState): PresentationPayload {
   const l = theme.values.locales || {};
   const user = ev.user.displayName;
 
+  const context: Record<string, any> = {
+    user,
+    displayName: user,
+  };
+
+  if (ev.kind === "twitch.sub") {
+    context.tier = ev.tier;
+    context.months = ev.months;
+    context.count = ev.months;
+  } else if (ev.kind === "twitch.raid") {
+    context.viewers = ev.viewers;
+    context.count = ev.viewers;
+  } else if (ev.kind === "twitch.cheer") {
+    context.bits = ev.bits;
+    context.count = ev.bits;
+  }
+
   switch (ev.kind) {
     case "chat.message":
       const isDeleted = (ev as any).isDeleted;
@@ -147,7 +164,9 @@ function getPresentation(ev: AppEvent, theme: ThemeState): PresentationPayload {
         layers: [
           {
             id: "body",
-            parts: isDeleted ? t(l, "chat.moderation.deleted") : ev.parts,
+            parts: isDeleted
+              ? t(l, "chat.moderation.deleted", context)
+              : ev.parts,
           },
         ],
       };
@@ -157,7 +176,7 @@ function getPresentation(ev: AppEvent, theme: ThemeState): PresentationPayload {
         layout: "alert",
         styleHint: "twitch-follow",
         layers: [
-          { id: "title", parts: t(l, "alert.follow.title") },
+          { id: "title", parts: t(l, "alert.follow.title", context) },
           { id: "message", parts: [{ type: "text", content: user }] },
         ],
       };
@@ -169,24 +188,16 @@ function getPresentation(ev: AppEvent, theme: ThemeState): PresentationPayload {
         layers: [
           {
             id: "title",
-            parts: t(l, ev.isGift ? "alert.sub.gift_title" : "alert.sub.title"),
+            parts: t(
+              l,
+              ev.isGift ? "alert.sub.gift_title" : "alert.sub.title",
+              context
+            ),
           },
-          {
-            id: "message",
-            parts: [{ type: "text", content: user }],
-          },
-          {
-            id: "details",
-            parts: t(l, "alert.sub.details", {
-              tier: ev.tier,
-              months: ev.months,
-            }),
-          },
+          { id: "message", parts: [{ type: "text", content: user }] },
+          { id: "details", parts: t(l, "alert.sub.details", context) },
           ev.message
-            ? {
-                id: "content",
-                parts: [{ type: "text", content: ev.message }],
-              }
+            ? { id: "content", parts: [{ type: "text", content: ev.message }] }
             : null,
         ].filter((layer): layer is RenderLayer => layer !== null),
       };
@@ -196,9 +207,9 @@ function getPresentation(ev: AppEvent, theme: ThemeState): PresentationPayload {
         layout: "alert",
         styleHint: "twitch-raid",
         layers: [
-          { id: "title", parts: t(l, "alert.raid.title") },
+          { id: "title", parts: t(l, "alert.raid.title", context) },
           { id: "message", parts: [{ type: "text", content: user }] },
-          { id: "details", parts: t(l, "ui.viewers", { viewers: ev.viewers }) },
+          { id: "details", parts: t(l, "ui.viewers", context) },
         ],
       };
 
@@ -207,8 +218,8 @@ function getPresentation(ev: AppEvent, theme: ThemeState): PresentationPayload {
         layout: "alert",
         styleHint: "twitch-cheer",
         layers: [
-          { id: "title", parts: t(l, "alert.cheer.title") },
-          { id: "message", parts: t(l, "ui.bits", { bits: String(ev.bits) }) },
+          { id: "title", parts: t(l, "alert.cheer.title", context) },
+          { id: "message", parts: t(l, "ui.bits", context) },
           {
             id: "details",
             parts: ev.message
