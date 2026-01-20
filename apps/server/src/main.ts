@@ -93,6 +93,16 @@ async function startTwitchServices(cfg: AppConfig) {
         payload: entry.payload,
       });
     },
+    onMessageDeleted: (msgId) => {
+      hub.broadcast({
+        op: "event:update",
+        id: msgId,
+        patch: { isDeleted: true },
+      });
+    },
+    onUserTimedOut: ({ login, duration }) => {
+      console.log(`[mod] ${login} was ${duration ? "timed out" : "banned"}`);
+    },
   });
 
   // eventsub alerts

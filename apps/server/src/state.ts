@@ -4,11 +4,11 @@ import {
   ThemeStateSchema,
   type AppConfig,
   type AppEvent,
-  type ChatMessageEvent,
   type EvaluatedEvent,
   type Ruleset,
   type ThemeState,
   type MessagePart,
+  type PresentationPayload,
 } from "@maho/shared";
 import { createRulesEngine, type RulesEngine } from "@maho/rules";
 import { EmoteMap, enrichMessageParts } from "./emotes";
@@ -44,13 +44,7 @@ export function createInitialState(seed?: {
   theme?: ThemeState;
 }): State {
   const config =
-    seed?.config ??
-    AppConfigSchema.parse({
-      channel: "test",
-      apiKey: crypto.randomUUID(),
-      maxMessages: 50,
-    });
-
+    seed?.config ?? AppConfigSchema.parse({ channel: "test", maxMessages: 50 });
   const theme =
     seed?.theme ??
     ThemeStateSchema.parse({
@@ -61,22 +55,22 @@ export function createInitialState(seed?: {
         disappear: true,
         showNames: true,
         customCss: "",
+
+        locales: {
+          "alert.follow.title": "New follower",
+          "alert.sub.title": "New subscriber",
+          "alert.sub.gift_title": "Gift subscription",
+          "alert.raid.title": "Incoming raid",
+          "alert.cheer.title": "Cheer",
+          "chat.placeholder.link": "[link]",
+          "ui.viewers": "{count} viewers",
+          "ui.bits": "{bits} bits",
+        },
       },
     });
 
   const ruleset =
-    seed?.ruleset ??
-    RulesetSchema.parse({
-      version: 1,
-      rules: [
-        {
-          id: "system-hide-links",
-          enabled: false,
-          match: { kind: "chat.message", textRegex: "(https?://|www\\.)\\S+" },
-          actions: [{ type: "maskUrl" }],
-        },
-      ],
-    });
+    seed?.ruleset ?? RulesetSchema.parse({ version: 1, rules: [] });
 
   return {
     config,
@@ -94,25 +88,142 @@ export function createInitialState(seed?: {
   };
 }
 
+function t(
+  locales: Record<string, string>,
+  key: string,
+  vars: Record<string, string> = {}
+): MessagePart[] {
+  let template = locales[key] || key;
+  for (const [k, v] of Object.entries(vars)) {
+    template = template.replace(`{${k}}`, v);
+  }
+  return [{ type: "text", content: template }];
+}
+
+function getPresentation(ev: AppEvent, theme: ThemeState): PresentationPayload {
+  const l = theme.values.locales || {};
+  const user = ev.user.displayName;
+
+  switch (ev.kind) {
+    case "chat.message":
+      return { layout: "chat", layers: [{ id: "body", parts: ev.parts }] };
+
+    case "twitch.follow":
+      return {
+        layout: "alert",
+        styleHint: "twitch-follow",
+        layers: [
+          { id: "title", parts: t(l, "alert.follow.title") },
+          { id: "message", parts: [{ type: "text", content: user }] },
+        ],
+      };
+
+    case "twitch.sub":
+      return {
+        layout: "alert",
+        styleHint: "twitch-sub",
+        layers: [
+          {
+            id: "title",
+            parts: t(l, ev.isGift ? "alert.sub.gift_title" : "alert.sub.title"),
+          },
+          { id: "message", parts: [{ type: "text", content: user }] },
+          {
+            id: "details",
+            parts: t(l, "alert.sub.details", {
+              tier: ev.tier,
+              months: String(ev.months),
+            }),
+          },
+        ],
+      };
+
+    case "twitch.raid":
+      return {
+        layout: "alert",
+        styleHint: "twitch-raid",
+        layers: [
+          { id: "title", parts: t(l, "alert.raid.title") },
+          { id: "message", parts: [{ type: "text", content: user }] },
+          {
+            id: "details",
+            parts: t(l, "ui.viewers", { count: String(ev.viewers) }),
+          },
+        ],
+      };
+
+    case "twitch.cheer":
+      return {
+        layout: "alert",
+        styleHint: "twitch-cheer",
+        layers: [
+          { id: "title", parts: t(l, "alert.cheer.title") },
+          { id: "message", parts: t(l, "ui.bits", { bits: String(ev.bits) }) },
+          {
+            id: "details",
+            parts: ev.message
+              ? [{ type: "text", content: ev.message }]
+              : [{ type: "text", content: user }],
+          },
+        ],
+      };
+
+    default:
+      return { layout: "chat", layers: [] };
+  }
+}
+
+export function evaluateEvent(state: State, ev: AppEvent): EvaluatedEvent {
+  let next: AppEvent = { ...ev };
+  let actions: any[] = [];
+
+  if (next.kind === "chat.message") {
+    const twitchData = (next.provider as any)?.twitch;
+    const badgeTag = twitchData?.tags?.["badges"];
+    if (badgeTag) {
+      next.user.badges = resolveBadges(
+        badgeTag,
+        state.badgeMaps.global,
+        state.badgeMaps.channel
+      );
+    }
+    actions = state.engine.evaluate(next, Date.now());
+
+    if (next.parts) {
+      let parts = enrichMessageParts(next.parts, state.emoteMap);
+
+      if (actions.some((a) => a.type === "maskUrl")) {
+        const linkPlaceholder =
+          state.theme.values.locales?.["chat.placeholder.link"] || "[link]";
+        parts = parts.map((p) =>
+          p.type === "link" ? { type: "text", content: linkPlaceholder } : p
+        );
+      }
+      next.parts = parts;
+    }
+  }
+
+  return {
+    event: next,
+    actions,
+    presentation: getPresentation(next, state.theme),
+  };
+}
+
 export function sanitizeConfig(cfg: AppConfig): AppConfig {
   const safe = { ...cfg };
   safe.hasTwitchToken = !!safe.twitchToken;
-
   delete safe.twitchToken;
   delete safe.apiKey;
-
   return safe;
 }
 
 export function sanitizePatch(patch: Partial<AppConfig>): Partial<AppConfig> {
   const safe = { ...patch };
-
   if ("twitchToken" in safe) {
-    const val = safe.twitchToken;
-    safe.hasTwitchToken = !!val && val.length > 0;
+    safe.hasTwitchToken = !!safe.twitchToken && safe.twitchToken.length > 0;
     delete safe.twitchToken;
   }
-
   delete safe.apiKey;
   return safe;
 }
@@ -120,14 +231,9 @@ export function sanitizePatch(patch: Partial<AppConfig>): Partial<AppConfig> {
 export function validateConfig(input: unknown) {
   return AppConfigSchema.safeParse(input);
 }
-
 export function validateTheme(input: unknown) {
-  return ThemeStateSchema.safeParse(input);
+  return ThemeStateSchema.parse(input);
 }
-export function sanitizeTheme(t: ThemeState) {
-  return t;
-}
-
 export function validateRuleset(input: unknown) {
   return RulesetSchema.safeParse(input);
 }
@@ -135,75 +241,4 @@ export function validateRuleset(input: unknown) {
 export function setRuleset(state: State, ruleset: Ruleset) {
   state.ruleset = ruleset;
   state.engine = createRulesEngine(ruleset);
-}
-
-function isUrl(s: string): boolean {
-  return /^(?:https?:\/\/|www\.)/i.test(s);
-}
-
-function processLinks(parts: MessagePart[], hide: boolean): MessagePart[] {
-  const out: MessagePart[] = [];
-  const urlRegex = /((?:https?:\/\/|www\.)[^\s]+)/g;
-
-  for (const part of parts) {
-    if (part.type !== "text") {
-      out.push(part);
-      continue;
-    }
-
-    const tokens = part.content.split(urlRegex);
-
-    for (const token of tokens) {
-      if (!token) continue;
-
-      if (isUrl(token)) {
-        if (hide) {
-          out.push({ type: "text", content: "[link]" });
-        } else {
-          const url = token.startsWith("www.") ? `https://${token}` : token;
-          out.push({ type: "link", url, text: token });
-        }
-      } else {
-        out.push({ type: "text", content: token });
-      }
-    }
-  }
-  return out;
-}
-
-export function evaluateEvent(state: State, ev: AppEvent): EvaluatedEvent {
-  if (ev.kind !== "chat.message") {
-    return { event: ev, actions: [] };
-  }
-
-  let next: ChatMessageEvent = ev;
-
-  const twitchData = (next.provider as Record<string, any> | undefined)?.twitch as
-    | { tags?: Record<string, string> }
-    | undefined;
-  const badgeTag = twitchData?.tags?.["badges"];
-
-  if (badgeTag) {
-    next.user.badges = resolveBadges(
-      badgeTag,
-      state.badgeMaps.global,
-      state.badgeMaps.channel
-    );
-  }
-
-  const actions = state.engine.evaluate(next, Date.now());
-
-  let maskLinks = false;
-
-  for (const a of actions) {
-    if (a.type === "maskUrl") maskLinks = true;
-  }
-
-  if (next.parts) {
-    let processedParts = enrichMessageParts(next.parts, state.emoteMap);
-    processedParts = processLinks(processedParts, maskLinks);
-    next = { ...next, parts: processedParts };
-  }
-
-  return { event: next, actions };
 }
