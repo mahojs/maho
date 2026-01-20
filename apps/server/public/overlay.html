@@ -4,6 +4,22 @@
     <meta charset="utf-8" />
     <title>maho overlay</title>
     <style>
+      :root {
+        --user-color: #ffffff;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+      }
+
       body {
         margin: 0;
         background: transparent;
@@ -11,134 +27,125 @@
         font-family:
           system-ui,
           -apple-system,
+          Segoe UI,
+          Roboto,
+          Arial,
           sans-serif;
+        font-size: 16px;
+        line-height: 1.4;
         overflow: hidden;
       }
+
       #wrap {
+        height: 100vh;
         padding: 16px;
         display: flex;
         flex-direction: column;
         justify-content: flex-end;
-        height: 100vh;
-        box-sizing: border-box;
+        align-items: flex-start;
+        gap: 8px;
       }
 
-      .chat-line {
-        margin: 4px 0;
-        width: fit-content;
-        max-width: 100%;
+      .item-row {
+        position: relative;
         display: block;
+        min-width: 0;
+        max-width: 520px;
+        padding: 0;
+        margin: 0;
+
         opacity: 0;
         transform: translateY(10px);
-        transition:
-          opacity 0.4s ease,
-          transform 0.4s ease;
-        animation: enter 0.4s forwards;
+        animation: maho-enter 0.3s ease-out forwards;
+
+        overflow: visible;
       }
 
-      @keyframes enter {
+      @keyframes maho-enter {
         to {
           opacity: 1;
           transform: translateY(0);
         }
       }
 
-      .chat-line--exiting {
-        opacity: 0;
-        transform: translateY(-10px);
+      .item-row--exiting {
+        opacity: 0 !important;
+        transform: translateX(-10px) !important;
+        transition:
+          opacity 0.4s ease,
+          transform 0.4s ease;
+        animation: none !important;
       }
 
-      .chat-line--suppressed {
-        opacity: 0.5;
-        text-decoration: line-through;
+      .chat-message__header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
       }
 
-      .chat-line__header {
-        display: inline;
-        font-weight: 700;
-        margin-right: 4px;
-      }
-
-      .chat-line__body {
-        display: inline;
-        background: rgba(0, 0, 0, 0.6);
-        border-radius: 8px;
-        padding: 4px 8px;
-        line-height: 1.4;
-        word-wrap: break-word;
-      }
-
-      .chat-line__author {
-        color: #a970ff; /* fallback */
-      }
-
-      .chat-line__separator {
-        margin-right: 4px;
-      }
-
-      .chat-line__badges {
-        margin-right: 4px;
-        display: inline-block;
-        vertical-align: middle;
+      .chat-message__badges {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
       }
 
       .chat-badge {
-        display: inline-block;
-        vertical-align: middle;
-        height: 18px;
-        margin-right: 2px;
-        border-radius: 2px;
-      }
-
-      .chat-line__part-emote {
-        height: 1.2em;
-        vertical-align: middle;
-        margin: 0 2px;
-      }
-
-      .chat-line__part-mention {
-        font-weight: bold;
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 4px;
-        padding: 0 4px;
-      }
-
-      .chat-line__part-link {
-        color: #aaa;
-        text-decoration: underline;
-      }
-
-      /* compatibility alias */
-      .message-row {
         display: block;
+        height: 1em;
+        width: auto;
+      }
+
+      .chat-message__author {
+        font-weight: 700;
+        color: var(--user-color);
+      }
+
+      .chat-message__body {
+        word-break: break-word;
+        overflow-wrap: anywhere;
+      }
+
+      .chat-message__part-emote {
+        height: 1.3em;
+        vertical-align: middle;
+      }
+
+      .event-alert__title {
+        font-weight: 700;
+      }
+
+      .event-alert__message {
+        font-weight: 700;
+      }
+
+      .event-alert__details {
+        opacity: 0.85;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
       }
     </style>
   </head>
   <body>
     <div id="wrap"></div>
+
     <script>
       const wrap = document.getElementById("wrap");
 
-      let styleTag = document.getElementById("maho-custom-css");
-      if (!styleTag) {
-        styleTag = document.createElement("style");
-        styleTag.id = "maho-custom-css";
-        document.head.appendChild(styleTag);
-      }
+      const ws = new WebSocket(
+        `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/ws`
+      );
 
-      const wsProto = location.protocol === "https:" ? "wss:" : "ws:";
-      const ws = new WebSocket(`${wsProto}//${location.host}/ws`);
+      const styleTag = document.createElement("style");
+      styleTag.id = "maho-custom-css";
+      document.head.appendChild(styleTag);
 
       let lastEventSeq = -1;
-      let lastConfigRev = -1;
-      let lastThemeRev = -1;
 
-      let sysConfig = {
-        maxMessages: 50,
-      };
-
+      let sysConfig = { maxMessages: 50 };
       let theme = {
-        activeThemeId: "default",
         values: {
           lifetimeMs: 30000,
           fadeMs: 400,
@@ -161,7 +168,7 @@
         }
 
         prune() {
-          while (this.items.length > sysConfig.maxMessages) {
+          while (this.items.length > (Number(sysConfig.maxMessages) || 50)) {
             const item = this.items.shift();
             this.remove(item.el);
           }
@@ -169,7 +176,6 @@
 
         scheduleExpiry(el) {
           if (!theme.values.disappear) return;
-
           const ms = Number(theme.values.lifetimeMs) || 30000;
           setTimeout(() => {
             if (document.body.contains(el)) this.remove(el);
@@ -177,12 +183,12 @@
         }
 
         remove(el) {
-          if (el.classList.contains("chat-line--exiting")) return;
+          if (!el || el.classList.contains("item-row--exiting")) return;
 
           const fade = Number(theme.values.fadeMs) || 400;
-
-          el.classList.add("chat-line--exiting");
+          el.classList.add("item-row--exiting");
           el.style.transitionDuration = fade + "ms";
+
           setTimeout(() => el.remove(), fade);
         }
 
@@ -194,185 +200,208 @@
 
       const queue = new Queue();
 
-      function renderPart(part) {
-        if (part.type === "text") return document.createTextNode(part.content);
-
-        if (part.type === "emote") {
+      function renderPart(p) {
+        if (!p || typeof p !== "object") return document.createTextNode("");
+        if (p.type === "text") return document.createTextNode(p.content ?? "");
+        if (p.type === "emote") {
           const img = document.createElement("img");
-          if (part.url) {
-            img.src = part.url;
-          } else {
-            img.src =
-              "https://static-cdn.jtvnw.net/emoticons/v2/" +
-              part.id +
-              "/default/dark/1.0";
-          }
-          img.className = "chat-line__part-emote";
-          img.alt = part.name;
+          img.className = "chat-message__part-emote";
+          img.src = p.url || `https://static-cdn.jtvnw.net/emoticons/v2/${p.id}/default/dark/1.0`;
           return img;
         }
-
-        if (part.type === "mention") {
+        if (p.type === "mention") {
           const span = document.createElement("span");
-          span.className = "chat-line__part-mention";
-          span.textContent = "@" + part.user;
+          span.className = "chat-message__part-mention";
+          span.textContent = "@" + p.user;
           return span;
         }
-
-        if (part.type === "link") {
-          const a = document.createElement("span");
-          a.className = "chat-line__part-link";
-          a.textContent = "[link]";
-          return a;
+        if (p.type === "link") {
+          const span = document.createElement("span");
+          span.className = "chat-message__part-link";
+          span.textContent = "[link]";
+          return span;
         }
         return document.createTextNode("");
       }
 
-      function applyEvent(payload) {
-        const ev = payload.event;
-        const actions = payload.actions || [];
+      function applyThemePatch(patch) {
+        if (!patch || typeof patch !== "object") return;
+        if (!patch.values || typeof patch.values !== "object") return;
 
-        const div = document.createElement("div");
-        div.className = "chat-line";
-        div.classList.add("message-row"); // compatibility alias
-
-        div.dataset.id = ev.id;
-        div.dataset.platform = ev.platform;
-        div.dataset.user = ev.user.login;
-        if (ev.user.id) div.dataset.userId = ev.user.id;
-
-        ev.user.roles.forEach((role) => {
-          div.dataset["role" + role.charAt(0).toUpperCase() + role.slice(1)] =
-            "true";
-          div.classList.add("user-" + role);
-        });
-
-        actions.forEach((a) => {
-          if (a.type === "suppress") div.classList.add("chat-line--suppressed");
-          if (a.type === "addClass") div.classList.add(a.value);
-          if (a.type === "setVar")
-            div.style.setProperty("--" + a.name, a.value);
-        });
-
-        const header = document.createElement("div");
-        header.className = "chat-line__header";
-
-        if (theme.values.showNames) {
-          // badges
-          const badgesContainer = document.createElement("span");
-          badgesContainer.className = "chat-line__badges";
-
-          if (ev.user.badges && ev.user.badges.length > 0) {
-            ev.user.badges.forEach((b) => {
-              const img = document.createElement("img");
-              img.className = "chat-badge";
-              img.src = b.url;
-              img.alt = b.title;
-              img.title = b.title;
-              img.classList.add("chat-badge--" + b.setId);
-              badgesContainer.appendChild(img);
-            });
-          }
-          header.appendChild(badgesContainer);
-
-          const name = document.createElement("span");
-          name.className = "chat-line__author";
-          name.textContent = ev.user.displayName;
-          name.style.color = ev.user.color || "#a970ff";
-
-          div.style.setProperty("--user-color", ev.user.color || "#a970ff");
-
-          header.appendChild(name);
-
-          const sep = document.createElement("span");
-          sep.className = "chat-line__separator";
-          sep.textContent = ": ";
-          header.appendChild(sep);
-
-          div.appendChild(header);
-        }
-
-        const body = document.createElement("div");
-        body.className = "chat-line__body";
-
-        if (ev.parts) {
-          ev.parts.forEach((p) => body.appendChild(renderPart(p)));
-        } else {
-          body.textContent = ev.text;
-        }
-
-        div.appendChild(body);
-
-        queue.add(div);
-      }
-
-      function updateConfig(rev, patch) {
-        if (rev < lastConfigRev) return;
-        lastConfigRev = rev;
-        sysConfig = { ...sysConfig, ...patch };
-        queue.prune();
-      }
-
-      function updateTheme(rev, patch) {
-        if (rev < lastThemeRev) return;
-        lastThemeRev = rev;
-
-        if (patch.activeThemeId) theme.activeThemeId = patch.activeThemeId;
-        if (patch.values) {
-          theme.values = { ...theme.values, ...patch.values };
-        }
+        theme.values = { ...theme.values, ...patch.values };
 
         if (typeof theme.values.customCss === "string") {
           styleTag.textContent = theme.values.customCss;
         }
       }
 
-      ws.addEventListener("open", () => {
+      function applyState(msg) {
+        if (msg?.config?.data) sysConfig = msg.config.data;
+        if (msg?.theme?.data) {
+          // accept either {values:{...}} or raw theme object
+          theme = msg.theme.data;
+          if (!theme.values) theme.values = {};
+          if (typeof theme.values.customCss === "string") {
+            styleTag.textContent = theme.values.customCss;
+          }
+        }
+      }
+
+      function applyEvent(payload) {
+        if (!payload || typeof payload !== "object") return;
+
+        const ev = payload.event || {};
+        const pres = payload.presentation || {};
+
+        const actions = Array.isArray(payload.actions) ? payload.actions : [];
+        const layers = Array.isArray(pres.layers) ? pres.layers : [];
+
+        const isChat = pres.layout === "chat";
+
+        const container = document.createElement(isChat ? "article" : "aside");
+        container.className = `item-row ${isChat ? "chat-message" : "event-alert"}`;
+
+        if (pres.styleHint) container.classList.add(`hint--${pres.styleHint}`);
+
+        if (ev?.user?.color) {
+          container.style.setProperty("--user-color", ev.user.color);
+        }
+
+        if (isChat && theme.values.showNames) {
+          const header = document.createElement("header");
+          header.className = "chat-message__header";
+
+          const badges = Array.isArray(ev?.user?.badges) ? ev.user.badges : [];
+          if (badges.length > 0) {
+            const bCont = document.createElement("span");
+            bCont.className = "chat-message__badges";
+
+            for (const b of badges) {
+              if (!b?.url) continue;
+              const img = document.createElement("img");
+              img.className = "chat-badge";
+              img.src = b.url;
+              img.alt = b.title || "";
+              img.title = b.title || "";
+              bCont.appendChild(img);
+            }
+
+            if (bCont.childNodes.length > 0) header.appendChild(bCont);
+          }
+
+          const name = document.createElement("span");
+          name.className = "chat-message__author";
+          name.textContent = ev?.user?.displayName ?? "Unknown";
+          header.appendChild(name);
+
+          container.appendChild(header);
+        }
+
+        // layer rendering
+        for (const layer of layers) {
+          if (!layer || typeof layer !== "object") continue;
+
+          const prefix = isChat ? "chat-message" : "event-alert";
+          const id = String(layer.id || "").trim();
+          if (!id) continue;
+
+          const parts = Array.isArray(layer.parts) ? layer.parts : [];
+          if (parts.length === 0) continue;
+
+          const el = document.createElement("div");
+          el.className = `${prefix}__${id}`;
+
+          for (const p of parts) el.appendChild(renderPart(p));
+
+          if (el.textContent === "" && el.querySelector("img") == null)
+            continue;
+
+          container.appendChild(el);
+        }
+
+        // rules actions
+        for (const a of actions) {
+          if (!a || typeof a !== "object") continue;
+
+          if (a.type === "addClass" && typeof a.value === "string") {
+            container.classList.add(a.value);
+          }
+          if (a.type === "setVar" && typeof a.name === "string") {
+            container.style.setProperty("--" + a.name, String(a.value ?? ""));
+          }
+        }
+
+        queue.add(container);
+      }
+
+      ws.onopen = () => {
         ws.send(
           JSON.stringify({ op: "hello", role: "overlay", protocolVersion: 1 })
         );
-      });
+      };
 
-      ws.addEventListener("message", (e) => {
-        const msg = JSON.parse(e.data);
-
-        if (msg.op === "state") {
-          updateConfig(msg.config.rev, msg.config.data);
-          updateTheme(msg.theme.rev, msg.theme.data);
+      ws.onmessage = (e) => {
+        let msg;
+        try {
+          msg = JSON.parse(e.data);
+        } catch {
           return;
         }
 
-        if (msg.op === "config:changed") {
-          updateConfig(msg.rev, msg.patch);
+        if (msg.op === "state") {
+          applyState(msg);
           return;
         }
 
         if (msg.op === "theme:changed") {
-          updateTheme(msg.rev, msg.patch);
+          applyThemePatch(msg.patch);
           return;
         }
 
-        if (msg.op === "event") {
-          if (typeof msg.seq === "number") {
-            if (msg.seq <= lastEventSeq) return;
-            lastEventSeq = msg.seq;
+        if (msg.op === "config:changed") {
+          if (msg.patch && typeof msg.patch === "object") {
+            sysConfig = { ...sysConfig, ...msg.patch };
+            queue.prune();
           }
-          applyEvent(msg.payload);
           return;
         }
 
         if (msg.op === "replay") {
           queue.reset();
           lastEventSeq = -1;
-
-          msg.events.forEach((e) => {
-            if (e.seq <= lastEventSeq) return;
-            lastEventSeq = e.seq;
-            applyEvent(e.payload);
-          });
+          const events = Array.isArray(msg.events) ? msg.events : [];
+          for (const evt of events) {
+            if (typeof evt.seq === "number" && evt.seq > lastEventSeq) {
+              lastEventSeq = evt.seq;
+              applyEvent(evt.payload);
+            }
+          }
           return;
         }
-      });
+
+        if (msg.op === "event") {
+          if (typeof msg.seq === "number" && msg.seq > lastEventSeq) {
+            lastEventSeq = msg.seq;
+            applyEvent(msg.payload);
+          }
+          return;
+        }
+
+        if (msg.op === "event:update") {
+          const el = wrap.querySelector(`[data-id="${msg.id}"]`);
+          if (!el) return;
+
+          if (msg.patch.isDeleted) {
+            const body = el.querySelector(".chat-message__body");
+            if (body) {
+              // TODO: send translated string from server
+              el.classList.add("chat-message--suppressed");
+              body.textContent = "<deleted>";
+            }
+          }
+          return;
+        }
+      };
     </script>
   </body>
 </html>
