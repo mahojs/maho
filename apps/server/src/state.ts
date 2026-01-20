@@ -9,6 +9,7 @@ import {
   type ThemeState,
   type MessagePart,
   type PresentationPayload,
+  type RenderLayer,
 } from "@maho/shared";
 import { createRulesEngine, type RulesEngine } from "@maho/rules";
 import { EmoteMap, enrichMessageParts } from "./emotes";
@@ -119,23 +120,35 @@ function getPresentation(ev: AppEvent, theme: ThemeState): PresentationPayload {
       };
 
     case "twitch.sub":
+      const subLayers: RenderLayer[] = [
+        {
+          id: "title",
+          parts: t(l, ev.isGift ? "alert.sub.gift_title" : "alert.sub.title"),
+        },
+        {
+          id: "message",
+          parts: [{ type: "text", content: user }],
+        },
+        {
+          id: "details",
+          parts: t(l, "alert.sub.details", {
+            tier: ev.tier,
+            months: String(ev.months),
+          }),
+        },
+      ];
+
+      if (ev.message) {
+        subLayers.push({
+          id: "content",
+          parts: [{ type: "text", content: ev.message }],
+        });
+      }
+
       return {
         layout: "alert",
         styleHint: "twitch-sub",
-        layers: [
-          {
-            id: "title",
-            parts: t(l, ev.isGift ? "alert.sub.gift_title" : "alert.sub.title"),
-          },
-          { id: "message", parts: [{ type: "text", content: user }] },
-          {
-            id: "details",
-            parts: t(l, "alert.sub.details", {
-              tier: ev.tier,
-              months: String(ev.months),
-            }),
-          },
-        ],
+        layers: subLayers,
       };
 
     case "twitch.raid":
