@@ -61,8 +61,10 @@ export function createInitialState(seed?: {
           "alert.follow.title": "New follower",
           "alert.sub.title": "New subscriber",
           "alert.sub.gift_title": "Gift subscription",
+          "alert.sub.details": "Tier {tier}, {months} months",
           "alert.raid.title": "Incoming raid",
           "alert.cheer.title": "Cheer",
+          "chat.moderation.deleted": "Message deleted",
           "chat.placeholder.link": "[link]",
           "ui.viewers": "{count} viewers",
           "ui.bits": "{bits} bits",
@@ -92,13 +94,42 @@ export function createInitialState(seed?: {
 function t(
   locales: Record<string, string>,
   key: string,
-  vars: Record<string, string> = {}
+  vars: Record<string, any> = {}
 ): MessagePart[] {
   let template = locales[key] || key;
+  // handle pluralization
+  if (template.includes("|") && typeof vars.count === "number") {
+    const [plural, singular] = template.split("|");
+    template = vars.count === 1 ? singular : plural;
+  }
+
   for (const [k, v] of Object.entries(vars)) {
-    template = template.replace(`{${k}}`, v);
+    template = template.replace(`{${k}}`, String(v));
   }
   return [{ type: "text", content: template }];
+}
+
+function processLinks(parts: MessagePart[]): MessagePart[] {
+  const urlRegex = /((?:https?:\/\/|www\.)[^\s]+)/g;
+  const out: MessagePart[] = [];
+
+  for (const part of parts) {
+    if (part.type !== "text") {
+      out.push(part);
+      continue;
+    }
+
+    const tokens = part.content.split(urlRegex);
+    for (const token of tokens) {
+      if (!token) continue;
+      if (/^(?:https?:\/\/|www\.)/i.test(token)) {
+        out.push({ type: "link", url: token, text: token });
+      } else {
+        out.push({ type: "text", content: token });
+      }
+    }
+  }
+  return out;
 }
 
 function getPresentation(ev: AppEvent, theme: ThemeState): PresentationPayload {
@@ -107,7 +138,16 @@ function getPresentation(ev: AppEvent, theme: ThemeState): PresentationPayload {
 
   switch (ev.kind) {
     case "chat.message":
-      return { layout: "chat", layers: [{ id: "body", parts: ev.parts }] };
+      const isDeleted = (ev as any).isDeleted;
+      return {
+        layout: "chat",
+        layers: [
+          {
+            id: "body",
+            parts: isDeleted ? t(l, "chat.moderation.deleted") : ev.parts,
+          },
+        ],
+      };
 
     case "twitch.follow":
       return {
@@ -204,6 +244,8 @@ export function evaluateEvent(state: State, ev: AppEvent): EvaluatedEvent {
 
     if (next.parts) {
       let parts = enrichMessageParts(next.parts, state.emoteMap);
+
+      parts = processLinks(parts);
 
       if (actions.some((a) => a.type === "maskUrl")) {
         const linkPlaceholder =

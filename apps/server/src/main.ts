@@ -54,7 +54,6 @@ function scheduleSave() {
 }
 
 // twitch services
-
 let twitchIrc: { close: () => void } | null = null;
 let twitchEventSub: { close: () => void } | null = null;
 
@@ -94,6 +93,13 @@ async function startTwitchServices(cfg: AppConfig) {
       });
     },
     onMessageDeleted: (msgId) => {
+      const entry = state.eventLog.find((e) => e.payload.event.id === msgId);
+      if (entry) {
+        (entry.payload.event as any).isDeleted = true;
+        const updated = evaluateEvent(state, entry.payload.event);
+        entry.payload.presentation = updated.presentation;
+      }
+
       hub.broadcast({
         op: "event:update",
         id: msgId,
