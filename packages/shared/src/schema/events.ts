@@ -49,7 +49,6 @@ export const ChatUserSchema = z.object({
 export type ChatUser = z.infer<typeof ChatUserSchema>;
 
 // events
-
 export const ChatMessageEventSchema = z.object({
   kind: z.literal("chat.message"),
   id: z.string().min(1),
@@ -105,7 +104,6 @@ export const TwitchCheerEventSchema = z.object({
 export type TwitchCheerEvent = z.infer<typeof TwitchCheerEventSchema>;
 
 // union
-
 export const AppEventSchema = z.discriminatedUnion("kind", [
   ChatMessageEventSchema,
   TwitchFollowEventSchema,
@@ -114,3 +112,9 @@ export const AppEventSchema = z.discriminatedUnion("kind", [
   TwitchCheerEventSchema,
 ]);
 export type AppEvent = z.infer<typeof AppEventSchema>;
+
+// text sanitization
+const INVISIBLE_MARKERS_REGEX = /[\u034F\u200B-\u200D\u2060\uFEFF]/g;
+export function sanitizeText(raw: string): string {
+  return raw.replace(INVISIBLE_MARKERS_REGEX, "").trim();
+}

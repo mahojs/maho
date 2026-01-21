@@ -1,4 +1,5 @@
 import type { ChatMessageEvent, MessagePart, UserRole } from "@maho/shared";
+import { sanitizeText } from "@maho/shared";
 
 const TWITCH_IRC_WS = "wss://irc-ws.chat.twitch.tv:443";
 
@@ -12,18 +13,6 @@ export type TwitchIrcOptions = {
   onChatCleared?: () => void;
   onStatus?: (s: string) => void;
 };
-
-/* U+034F: combining grapheme joiner
-   U+200B: zero width space
-   U+200C: zero width non-Joiner
-   U+200D: zero width joiner
-   U+2060: word joiner
-   U+FEFF: zero width no-break Space */
-const INVISIBLE_MARKERS_REGEX = /[\u034F\u200B-\u200D\u2060\uFEFF]/g;
-
-function sanitizeText(raw: string): string {
-  return raw.replace(INVISIBLE_MARKERS_REGEX, "").trim();
-}
 
 function parseTags(tagsPart: string | undefined): Map<string, string> {
   const tags = new Map<string, string>();

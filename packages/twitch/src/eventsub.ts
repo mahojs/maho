@@ -6,6 +6,7 @@ import type {
   TwitchCheerEvent,
   UserRole,
 } from "@maho/shared";
+import { sanitizeText } from "@maho/shared";
 import { createSubscription, type TwitchTokenInfo } from "./api";
 
 const EVENTSUB_WS = "wss://eventsub.wss.twitch.tv/ws";
@@ -160,7 +161,7 @@ export function connectEventSub(opts: EventSubOptions) {
           isGift: isResub ? false : (data.is_gift ?? false),
           months: isResub ? (data.cumulative_months ?? 1) : 1,
           streak: isResub ? (data.streak_months ?? undefined) : undefined,
-          message: isResub ? (data.message?.text ?? undefined) : undefined,
+          message: isResub ? (data.message?.text ? sanitizeText(data.message.text) : undefined) : undefined,
         };
         opts.onEvent(ev);
         return;
@@ -191,7 +192,7 @@ export function connectEventSub(opts: EventSubOptions) {
             ? baseUser("Anonymous", "anonymous")
             : baseUser(data.user_name, data.user_login, data.user_id),
           bits: data.bits,
-          message: data.message,
+          message: data.message ? sanitizeText(data.message) : undefined,
         };
         opts.onEvent(ev);
         return;
