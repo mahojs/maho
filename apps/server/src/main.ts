@@ -98,13 +98,13 @@ async function startTwitchServices(cfg: AppConfig) {
         (entry.payload.event as any).isDeleted = true;
         const updated = evaluateEvent(state, entry.payload.event);
         entry.payload.presentation = updated.presentation;
-      }
 
-      hub.broadcast({
-        op: "event:update",
-        id: msgId,
-        patch: { isDeleted: true },
-      });
+        hub.broadcast({
+          op: "event:update",
+          id: msgId,
+          patch: { isDeleted: true, presentation: updated.presentation },
+        });
+      }
     },
     onUserTimedOut: ({ login, duration }) => {
       console.log(`[mod] ${login} was ${duration ? "timed out" : "banned"}`);

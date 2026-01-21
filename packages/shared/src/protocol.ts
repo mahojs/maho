@@ -1,5 +1,5 @@
 import type { AppConfig } from "./schema/config";
-import type { EvaluatedEvent } from "./actions";
+import type { EvaluatedEvent, PresentationPayload } from "./actions";
 import type { Ruleset } from "./schema/rules";
 import type { ThemeState } from "./schema/theme";
 
@@ -63,6 +63,7 @@ export type EventUpdate = {
   id: string;
   patch: {
     isDeleted?: boolean;
+    presentation?: PresentationPayload;
   };
 };
 

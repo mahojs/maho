@@ -396,12 +396,18 @@
           const el = wrap.querySelector(`[data-id="${msg.id}"]`);
           if (!el) return;
 
-          if (msg.patch.isDeleted) {
-            const body = el.querySelector(".chat-message__body");
-            if (body) {
-              // TODO: send translated string from server
-              el.classList.add("chat-message--suppressed");
-              body.textContent = "<deleted>";
+          if (msg.patch.isDeleted) el.classList.add("chat-message--suppressed");
+
+          if (msg.patch.presentation) {
+            el.querySelectorAll('[class*="__"]').forEach((node) =>
+              node.remove()
+            );
+
+            for (const layer of msg.patch.presentation.layers) {
+              const layerEl = document.createElement("div");
+              layerEl.className = `chat-message__${layer.id}`;
+              for (const p of layer.parts) layerEl.appendChild(renderPart(p));
+              el.appendChild(layerEl);
             }
           }
           return;

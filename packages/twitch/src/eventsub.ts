@@ -1,7 +1,7 @@
 import type {
   AppEvent,
   TwitchFollowEvent,
-  TwitchSubEventSchema,
+  TwitchSubEvent,
   TwitchRaidEvent,
   TwitchCheerEvent,
   UserRole,
@@ -42,6 +42,7 @@ type KeepAlive = {
 
 export function connectEventSub(opts: EventSubOptions) {
   let ws: WebSocket | null = null;
+  let reconnectUrl: string | null = null;
   let keepAliveTimer: ReturnType<typeof setTimeout> | null = null;
   let keepAliveSeconds = 10; // default; updated by welcome
   let closed = false;
@@ -150,7 +151,7 @@ export function connectEventSub(opts: EventSubOptions) {
         type === "channel.subscription.message"
       ) {
         const isResub = type === "channel.subscription.message";
-        const ev: TwitchSubEventSchema = {
+        const ev: TwitchSubEvent = {
           kind: "twitch.sub",
           id,
           ts,
@@ -202,7 +203,13 @@ export function connectEventSub(opts: EventSubOptions) {
 
   function connect() {
     if (closed) return;
-    ws = new WebSocket(EVENTSUB_WS);
+
+    // use reconnectUrl if provided by twitch
+    const url = reconnectUrl || EVENTSUB_WS;
+    ws = new WebSocket(url);
+
+    // reset after use
+    reconnectUrl = null;
 
     ws.addEventListener("open", () => {
       log("connected");
@@ -241,7 +248,12 @@ export function connectEventSub(opts: EventSubOptions) {
         return;
       }
 
-      // TODO: handling reconnect URL/session_reconnect as we let connection die and auto-reconnect via close handler
+      if (type === "session_reconnect") {
+        reconnectUrl = data.payload.session.reconnect_url;
+        log("Twitch requested migration, reconnecting to provided URL...");
+        ws?.close(); // trigger close listener and call connect() again
+        return;
+      }
     });
 
     ws.addEventListener("close", () => {
