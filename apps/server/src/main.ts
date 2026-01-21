@@ -57,68 +57,39 @@ function scheduleSave() {
 let twitchIrc: { close: () => void } | null = null;
 let twitchEventSub: { close: () => void } | null = null;
 
+let isStartingServices = false;
+
 async function startTwitchServices(cfg: AppConfig) {
-  // shutdown existing
-  twitchIrc?.close();
-  twitchIrc = null;
-  twitchEventSub?.close();
-  twitchEventSub = null;
+  if (isStartingServices) return;
+  isStartingServices = true;
 
-  // validate identity
-  let identity: TwitchTokenInfo | null = null;
-  if (cfg.twitchToken) {
-    try {
-      identity = await validateToken(cfg.twitchToken);
-      console.log(
-        `[twitch] authenticated as ${identity.login} (client: ${identity.clientId})`
-      );
-    } catch (e: any) {
-      console.error(`[twitch] token validation failed: ${e.message}`);
-    }
-  }
+  try {
+    // shutdown existing
+    twitchIrc?.close();
+    twitchIrc = null;
+    twitchEventSub?.close();
+    twitchEventSub = null;
 
-  // irc
-  twitchIrc = connectTwitchIrc({
-    channel: cfg.channel,
-    username: identity?.login || cfg.twitchUsername || undefined,
-    token: cfg.twitchToken || undefined,
-    onStatus: (s) => console.log(s),
-    onChatMessage: (ev) => {
-      const payload = evaluateEvent(state, ev);
-      const entry = appendEvent(state, payload);
-      hub.broadcast({
-        op: "event",
-        seq: entry.seq,
-        payload: entry.payload,
-      });
-    },
-    onMessageDeleted: (msgId) => {
-      const entry = state.eventLog.find((e) => e.payload.event.id === msgId);
-      if (entry) {
-        (entry.payload.event as any).isDeleted = true;
-        const updated = evaluateEvent(state, entry.payload.event);
-        entry.payload.presentation = updated.presentation;
-
-        hub.broadcast({
-          op: "event:update",
-          id: msgId,
-          patch: { isDeleted: true, presentation: updated.presentation },
-        });
+    // validate identity
+    let identity: TwitchTokenInfo | null = null;
+    if (cfg.twitchToken) {
+      try {
+        identity = await validateToken(cfg.twitchToken);
+        console.log(
+          `[twitch] authenticated as ${identity.login} (client: ${identity.clientId})`
+        );
+      } catch (e: any) {
+        console.error(`[twitch] token validation failed: ${e.message}`);
       }
-    },
-    onUserTimedOut: ({ login, duration }) => {
-      console.log(`[mod] ${login} was ${duration ? "timed out" : "banned"}`);
-    },
-  });
+    }
 
-  // eventsub alerts
-  if (identity && cfg.twitchToken) {
-    twitchEventSub = connectEventSub({
-      token: cfg.twitchToken,
-      identity,
+    // irc
+    twitchIrc = connectTwitchIrc({
+      channel: cfg.channel,
+      username: identity?.login || cfg.twitchUsername || undefined,
+      token: cfg.twitchToken || undefined,
       onStatus: (s) => console.log(s),
-      onError: (e) => console.error(`[eventsub] error:`, e),
-      onEvent: (ev) => {
+      onChatMessage: (ev) => {
         const payload = evaluateEvent(state, ev);
         const entry = appendEvent(state, payload);
         hub.broadcast({
@@ -127,16 +98,53 @@ async function startTwitchServices(cfg: AppConfig) {
           payload: entry.payload,
         });
       },
+      onMessageDeleted: (msgId) => {
+        const entry = state.eventLog.find((e) => e.payload.event.id === msgId);
+        if (entry) {
+          (entry.payload.event as any).isDeleted = true;
+          const updated = evaluateEvent(state, entry.payload.event);
+          entry.payload.presentation = updated.presentation;
+
+          hub.broadcast({
+            op: "event:update",
+            id: msgId,
+            patch: { isDeleted: true, presentation: updated.presentation },
+          });
+        }
+      },
+      onUserTimedOut: ({ login, duration }) => {
+        console.log(`[mod] ${login} was ${duration ? "timed out" : "banned"}`);
+      },
     });
-  } else {
-    console.log("[eventsub] skipping: no valid token available");
+
+    // eventsub alerts
+    if (identity && cfg.twitchToken) {
+      twitchEventSub = connectEventSub({
+        token: cfg.twitchToken,
+        identity,
+        onStatus: (s) => console.log(s),
+        onError: (e) => console.error(`[eventsub] error:`, e),
+        onEvent: (ev) => {
+          const payload = evaluateEvent(state, ev);
+          const entry = appendEvent(state, payload);
+          hub.broadcast({
+            op: "event",
+            seq: entry.seq,
+            payload: entry.payload,
+          });
+        },
+      });
+    } else {
+      console.log("[eventsub] skipping: no valid token available");
+    }
+  } finally {
+    isStartingServices = false;
   }
 }
 
 startTwitchServices(state.config);
 
 // ws hub and config hooks
-
 const hub = createWsHub(state, SUPPORTED_PROTOCOL, scheduleSave, {
   async onConfigChanged(next, prev) {
     const needsReconnect =
