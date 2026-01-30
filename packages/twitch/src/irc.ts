@@ -117,7 +117,7 @@ export function connectTwitchIrc(opts: TwitchIrcOptions): {
   let ws: WebSocket | null = null;
   let closed = false;
 
-  const channel = opts.channel.replace(/^#/, "").trim();
+  const channel = opts.channel.replace(/^#/, "").trim().toLowerCase();
   if (!channel) throw new Error("channel is required");
 
   const hasAuth = !!opts.token && !!opts.username;
@@ -125,7 +125,7 @@ export function connectTwitchIrc(opts: TwitchIrcOptions): {
 
   let pass = "SCHMOOPIIE";
   if (hasAuth) {
-    pass = opts.token!.startsWith("oauth: ") ? opts.token! : `oauth:${opts.token}`;
+    pass = opts.token!.startsWith("oauth:") ? opts.token! : `oauth:${opts.token}`;
   }
 
   function log(s: string) {
