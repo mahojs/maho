@@ -2,7 +2,7 @@ import type {
   AppEvent,
   ChatMessageEvent,
   TwitchFollowEvent,
-  TwitchSubEventSchema,
+  TwitchSubEvent,
   TwitchRaidEvent,
   MessagePart,
   UserRole,
@@ -20,7 +20,7 @@ function json(data: unknown, status = 200) {
 }
 
 const PUBLIC_DIR = path.resolve(process.cwd(), "public");
-const CONTROL_DIR = path.join(PUBLIC_DIR, "control");
+const STUDIO_DIR = path.join(PUBLIC_DIR, "studio");
 
 export async function handleHttp(
   req: Request,
@@ -35,14 +35,13 @@ export async function handleHttp(
   }
 
   if (
-    url.pathname === "/control" ||
-    url.pathname === "/control/" ||
-    url.pathname === "/control/index.html"
+    url.pathname === "/studio" ||
+    url.pathname === "/studio/" ||
+    url.pathname === "/studio/index.html"
   ) {
-    const file = Bun.file(path.join(CONTROL_DIR, "index.html"));
+    const file = Bun.file(path.join(STUDIO_DIR, "index.html"));
     let html = await file.text();
 
-    // inject key
     const script = `<script>window.MAHO_API_KEY = "${state.config.apiKey}";</script>`;
     html = html.replace("</head>", `${script}</head>`);
 
@@ -51,10 +50,9 @@ export async function handleHttp(
     });
   }
 
-  if (url.pathname.startsWith("/control/")) {
-    const rel = url.pathname.slice("/control/".length); // no leading slash
-    const filePath = path.join(CONTROL_DIR, rel);
-
+  if (url.pathname.startsWith("/studio/")) {
+    const rel = url.pathname.slice("/studio/".length);
+    const filePath = path.join(STUDIO_DIR, rel);
     return new Response(Bun.file(filePath));
   }
 
@@ -104,7 +102,7 @@ export async function handleHttp(
           tier: "1000",
           isGift: false,
           months: 1,
-        } as TwitchSubEventSchema;
+        } as TwitchSubEvent;
       } else if (kind === "twitch.raid") {
         ev = {
           kind: "twitch.raid",

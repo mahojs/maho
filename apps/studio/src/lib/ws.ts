@@ -14,6 +14,9 @@ function now() {
 }
 
 function wsUrlFromLocation(): string {
+  if (import.meta.env.DEV) {
+    return `ws://localhost:3000/ws`;
+  }
   // `/ws` works as same-origin
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
   return `${proto}//${location.host}/ws`;

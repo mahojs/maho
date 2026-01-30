@@ -9,9 +9,9 @@ export default defineConfig({
     tailwindcss(),
     vue(),
   ],
-  base: "/control/",
+  base: "/",
   build: {
-    outDir: "../server/public/control",
+    outDir: "../server/public/studio",
     emptyOutDir: true,
   },
   server: {

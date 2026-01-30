@@ -1,21 +1,26 @@
 {
-  "name": "@maho/control",
+  "name": "@maho/studio",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && mkdir -p ../server/public/studio && rm -rf ../server/public/studio/* && cp -r dist/* ../server/public/studio/",
     "typecheck": "vue-tsc --noEmit",
     "lint": "eslint .",
-    "test": "bun test"
+    "test": "bun test",
+    "tauri": "tauri"
   },
   "dependencies": {
     "@maho/shared": "workspace:*",
+    "lucide-vue-next": "^0.563.0",
     "pinia": "^3.0.4",
+    "radix-vue": "^1.9.17",
     "vue": "^3.5.26"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.18",
+    "@tauri-apps/api": "^2.9.1",
+    "@tauri-apps/cli": "^2.9.6",
     "@vitejs/plugin-vue": "^6.0.3",
     "tailwindcss": "^4.1.18",
     "vite": "^7.3.0",
