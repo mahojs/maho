@@ -201,10 +201,14 @@ Bun.serve({
       if (origin) {
         try {
           const originUrl = new URL(origin);
-          if (
-            originUrl.hostname !== "localhost" &&
-            originUrl.hostname !== "127.0.0.1"
-          ) {
+          const isLocal =
+            originUrl.hostname === "localhost" ||
+            originUrl.hostname === "127.0.0.1" ||
+            originUrl.hostname === "tauri.localhost" ||
+            originUrl.protocol === "tauri:";
+
+          if (!isLocal) {
+            console.warn(`[server] blocked websocket origin: ${origin}`);
             return new Response("Forbidden", { status: 403 });
           }
         } catch {

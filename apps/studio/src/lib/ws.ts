@@ -8,13 +8,14 @@ import type {
   ClientRole,
 } from "@maho/shared";
 import { useServerStore, type ControlLogEntry } from "../stores/server";
+import { isTauri } from "@tauri-apps/api/core";
 
 function now() {
   return Date.now();
 }
 
 function wsUrlFromLocation(): string {
-  if (import.meta.env.DEV) {
+  if (import.meta.env.DEV || isTauri()) {
     return `ws://localhost:3000/ws`;
   }
   // `/ws` works as same-origin
