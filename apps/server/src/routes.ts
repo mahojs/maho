@@ -37,12 +37,20 @@ export async function handleHttp(
   if (
     url.pathname === "/studio" ||
     url.pathname === "/studio/" ||
-    url.pathname === "/studio/index.html"
+    url.pathname === "/studio/index.html" ||
+    url.pathname === "/"
   ) {
     const file = Bun.file(path.join(STUDIO_DIR, "index.html"));
-    let html = await file.text();
 
-    const script = `<script>window.MAHO_API_KEY = "${state.config.apiKey}";</script>`;
+    if (!(await file.exists())) {
+      return new Response(
+        "Studio not found. Please run 'bun run build' in apps/studio.",
+        { status: 404 }
+      );
+    }
+
+    let html = await file.text();
+    const script = `<script>window.MAHO_API_KEY = "${state.config.apiKey || ""}";</script>`;
     html = html.replace("</head>", `${script}</head>`);
 
     return new Response(html, {
@@ -54,12 +62,6 @@ export async function handleHttp(
     const rel = url.pathname.slice("/studio/".length);
     const filePath = path.join(STUDIO_DIR, rel);
     return new Response(Bun.file(filePath));
-  }
-
-  if (url.pathname === "/debug") {
-    return new Response(Bun.file(path.join(PUBLIC_DIR, "control.html")), {
-      headers: { "content-type": "text/html" },
-    });
   }
 
   if (url.pathname === "/health") return new Response("ok");

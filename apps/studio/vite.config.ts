@@ -9,7 +9,7 @@ export default defineConfig({
     tailwindcss(),
     vue(),
   ],
-  base: "/",
+  base: "/studio/",
   build: {
     outDir: "../server/public/studio",
     emptyOutDir: true,
