@@ -1,5 +1,5 @@
 import type { AppConfig, ProtocolVersion } from "@maho/shared";
-import { createInitialState, evaluateEvent } from "./state";
+import { createInitialState, evaluateEvent, applyThemePackage } from "./state";
 import { createWsHub } from "./wsHub";
 import { handleHttp } from "./routes";
 import {
@@ -10,6 +10,7 @@ import {
 import { loadEmotes } from "./emotes";
 import { loadBadges } from "./badges";
 import { appendEvent } from "./commands";
+import { loadTheme } from "./themes";
 import {
   connectTwitchIrc,
   validateToken,
@@ -35,6 +36,16 @@ const state = createInitialState({
   ruleset: persisted.rules,
   theme: persisted.theme,
 });
+
+const activeFolderId = state.theme.activeThemeId || "default";
+
+try {
+  const pkg = await loadTheme(activeFolderId);
+  applyThemePackage(state, pkg, activeFolderId);
+  console.log(`[themes] initialized with folder: ${activeFolderId}`);
+} catch (e) {
+  console.warn(`[themes] folder '${activeFolderId}' not found, using internal defaults.`);
+}
 
 let emoteLoadToken = 0;
 
@@ -178,7 +189,6 @@ const hub = createWsHub(state, SUPPORTED_PROTOCOL, scheduleSave, {
 });
 
 // server setup
-
 Bun.serve({
   port: PORT,
   hostname: HOST,

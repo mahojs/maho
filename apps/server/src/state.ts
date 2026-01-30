@@ -14,6 +14,7 @@ import {
 import { createRulesEngine, type RulesEngine } from "@maho/rules";
 import { EmoteMap, enrichMessageParts } from "./emotes";
 import { BadgeMap, resolveBadges } from "./badges";
+import { type ThemePackage } from "./themes";
 
 export type State = {
   // config
@@ -304,4 +305,20 @@ export function validateRuleset(input: unknown) {
 export function setRuleset(state: State, ruleset: Ruleset) {
   state.ruleset = ruleset;
   state.engine = createRulesEngine(ruleset);
+}
+
+export function applyThemePackage(state: State, pkg: ThemePackage, folder: string) {
+  state.theme.activeThemeId = folder;
+  state.theme.values = {
+    ...state.theme.values,
+    customCss: pkg.css,
+    locales: pkg.locales
+  };
+
+  state.themeRevision++;
+
+  state.eventLog.forEach((entry) => {
+    const updated = evaluateEvent(state, entry.payload.event);
+    entry.payload.presentation = updated.presentation;
+  });
 }

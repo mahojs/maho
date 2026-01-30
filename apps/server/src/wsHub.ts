@@ -11,8 +11,10 @@ import {
   sanitizeConfig,
   sanitizePatch,
   evaluateEvent,
+  applyThemePackage,
   type State,
 } from "./state";
+import { loadTheme } from "./themes";
 import type { ServerWebSocket } from "bun";
 
 type WsData = {};
@@ -77,7 +79,7 @@ export function createWsHub(
     roles.delete(ws);
   }
 
-  function onMessage(ws: WS, raw: unknown) {
+  async function onMessage(ws: WS, raw: unknown) {
     let msg: ClientToServer;
     try {
       msg = JSON.parse(String(raw));
@@ -186,40 +188,41 @@ export function createWsHub(
     if (msg.op === "theme:patch") {
       if (!requireControl(ws)) return;
 
-      const nextValues = { ...state.theme.values, ...(msg.patch.values || {}) };
-      const nextTheme = {
-        ...state.theme,
-        values: nextValues,
-      };
+      const requestedFolderId = msg.patch.activeThemeId;
+      const isSwitching =
+        requestedFolderId && requestedFolderId !== state.theme.activeThemeId;
 
-      if (msg.patch.activeThemeId) {
-        nextTheme.activeThemeId = msg.patch.activeThemeId;
+      if (isSwitching) {
+        try {
+          const pkg = await loadTheme(requestedFolderId);
+          applyThemePackage(state, pkg, requestedFolderId);
+          msg.patch.values = state.theme.values;
+          console.log(`[themes] switched to folder: ${requestedFolderId}`);
+        } catch (e: any) {
+          send(ws, {
+            op: "error",
+            message: `Theme folder not found: ${requestedFolderId}`,
+          });
+          return;
+        }
+      } else {
+        state.theme.values = {
+          ...state.theme.values,
+          ...(msg.patch.values || {}),
+        };
+        state.themeRevision++;
+        state.eventLog.forEach((e) => {
+          const updated = evaluateEvent(state, e.payload.event);
+          e.payload.presentation = updated.presentation;
+        });
       }
-
-      if (equals(nextTheme, state.theme)) {
-        return;
-      }
-
-      state.theme = nextTheme;
-      state.themeRevision++;
-
-      state.eventLog.forEach((entry) => {
-        const reEvaluated = evaluateEvent(state, entry.payload.event);
-        entry.payload.presentation = reEvaluated.presentation;
-      });
 
       broadcast({
         op: "theme:changed",
         rev: state.themeRevision,
         patch: msg.patch,
       });
-
-      // redraw existing
-      broadcast({
-        op: "replay",
-        events: state.eventLog,
-      });
-
+      broadcast({ op: "replay", events: state.eventLog });
       schedulePersist();
       return;
     }
