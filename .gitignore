@@ -19,6 +19,7 @@ out/
 # local data & logs
 data/
 logs/
+scripts/
 *.log
 .env
 .DS_Store
@@ -31,3 +32,4 @@ report.*.json
 
 apps/server/public/control/
 apps/server/public/overlay/
+apps/studio/src-tauri/
