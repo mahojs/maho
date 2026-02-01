@@ -4,6 +4,5 @@ export type AppConfig = {
   twitchUsername?: string;
   twitchToken?: string;
   hasTwitchToken?: boolean;
-  seventvUserId?: string;
   maxMessages: number;
 };

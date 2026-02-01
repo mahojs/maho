@@ -13,13 +13,14 @@ import { appendEvent } from "./commands";
 import { loadTheme } from "./themes";
 import {
   connectTwitchIrc,
-  validateToken,
   connectEventSub,
+  validateToken,
+  getTwitchUserByName,
   type TwitchTokenInfo,
 } from "@maho/twitch";
 
-const PORT = Number(process.env.PORT ?? 3000);
-const HOST = process.env.HOST ?? "127.0.0.1";
+const PORT = 3000;
+const HOST = "127.0.0.1";
 const SUPPORTED_PROTOCOL: ProtocolVersion = 1;
 
 const DATA_DIR = resolveAppDataPath();
@@ -44,12 +45,13 @@ try {
   applyThemePackage(state, pkg, activeFolderId);
   console.log(`[themes] initialized with folder: ${activeFolderId}`);
 } catch (e) {
-  console.warn(`[themes] folder '${activeFolderId}' not found, using internal defaults.`);
+  console.warn(
+    `[themes] folder '${activeFolderId}' not found, using default from config.`
+  );
 }
 
-let emoteLoadToken = 0;
-
-state.emoteMap = await loadEmotes(state.config);
+const channelUser = await getTwitchUserByName(state.config.channel);
+state.emoteMap = await loadEmotes(channelUser?.id);
 
 const initialBadges = await loadBadges(state.config.channel);
 state.badgeMaps.global = initialBadges.globalSet;
@@ -158,32 +160,16 @@ startTwitchServices(state.config);
 // ws hub and config hooks
 const hub = createWsHub(state, SUPPORTED_PROTOCOL, scheduleSave, {
   async onConfigChanged(next, prev) {
-    const needsReconnect =
-      next.channel !== prev.channel ||
-      next.twitchUsername !== prev.twitchUsername ||
-      next.twitchToken !== prev.twitchToken;
+    if (next.channel !== prev.channel) {
+      const user = await getTwitchUserByName(next.channel);
+      state.emoteMap = await loadEmotes(user?.id);
 
-    if (needsReconnect) {
-      startTwitchServices(next);
-      if (next.channel !== prev.channel) {
-        const b = await loadBadges(next.channel);
-        state.badgeMaps.channel = b.channelSet;
-      }
-    }
+      const b = await loadBadges(next.channel);
+      state.badgeMaps.channel = b.channelSet;
 
-    if (next.seventvUserId !== prev.seventvUserId) {
-      console.log("[emotes] config changed, reloading emotes...");
-      const token = ++emoteLoadToken;
-
-      loadEmotes(next)
-        .then((map) => {
-          if (token !== emoteLoadToken) return;
-          state.emoteMap = map;
-        })
-        .catch((e) => {
-          if (token !== emoteLoadToken) return;
-          console.error("[emotes] reload failed:", e);
-        });
+      await startTwitchServices(next);
+    } else if (next.twitchToken !== prev.twitchToken) {
+      await startTwitchServices(next);
     }
   },
 });
@@ -199,24 +185,9 @@ Bun.serve({
     if (url.pathname === "/ws") {
       const origin = req.headers.get("origin");
       if (origin) {
-        try {
-          const originUrl = new URL(origin);
-          const isLocal =
-            originUrl.hostname === "localhost" ||
-            originUrl.hostname === "127.0.0.1" ||
-            originUrl.hostname === "tauri.localhost" ||
-            originUrl.protocol === "tauri:";
-
-          if (!isLocal) {
-            console.warn(`[server] blocked websocket origin: ${origin}`);
-            return new Response("Forbidden", { status: 403 });
-          }
-        } catch {
-          if (origin !== "null") {
-            return new Response("Forbidden", { status: 403 });
-          }
-        }
+        console.log(`[server] ws connection attempt from origin: ${origin}`);
       }
+
       if (server.upgrade(req, { data: {} })) return;
       return new Response("upgrade failed", { status: 400 });
     }
@@ -249,5 +220,4 @@ process.on("SIGTERM", shutdown);
 console.log(`server:  http://${HOST}:${PORT}`);
 console.log(`health:  http://${HOST}:${PORT}/health`);
 console.log(`overlay: http://${HOST}:${PORT}/overlay`);
-console.log(`control: http://${HOST}:${PORT}/control`);
 console.log(`state file: ${filePath}`);

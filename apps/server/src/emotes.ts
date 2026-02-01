@@ -15,17 +15,13 @@ async function fetchJson<T>(url: string): Promise<T | null> {
   }
 }
 
-type SevenTVFile = {
-  name: string;
-  format: string;
-};
-
 type SevenTVEmote = {
+  id: string;
   name: string;
   data: {
     host: {
       url: string;
-      files: SevenTVFile[];
+      files: { name: string; format: string }[];
     };
   };
 };
@@ -35,39 +31,30 @@ type SevenTVEmoteSet = {
   emotes: SevenTVEmote[];
 };
 
-type SevenTVConnection = {
-  platform: string;
-  emote_set_id: string;
-  emote_set?: {
-    id: string;
-    emotes?: SevenTVEmote[];
-  };
-};
-
-type SevenTVUser = {
+type SevenTVTwitchLookupResponse = {
   id: string;
   username: string;
-  connections: SevenTVConnection[];
+  emote_set?: SevenTVEmoteSet;
 };
 
 function extract7TVEmotes(emotes: SevenTVEmote[], map: EmoteMap) {
   for (const e of emotes) {
-    const host = e.data.host;
-    if (!host.files || !host.files.length) continue;
+    const host = e.data?.host;
+    if (!host || !host.files || !host.files.length) continue;
+
     const file =
       host.files.find((f) => f.format === "WEBP" && f.name === "2x.webp") ||
       host.files.find((f) => f.format === "WEBP") ||
       host.files[0];
 
     if (!file) continue;
+
     const baseUrl = host.url.startsWith("//") ? `https:${host.url}` : host.url;
     map.set(e.name, `${baseUrl}/${file.name}`);
   }
 }
 
-export async function loadEmotes(config: {
-  seventvUserId?: string;
-}): Promise<EmoteMap> {
+export async function loadEmotes(twitchUserId?: string): Promise<EmoteMap> {
   const map: EmoteMap = new Map();
 
   const globalData = await fetchJson<SevenTVEmoteSet>(
@@ -78,35 +65,17 @@ export async function loadEmotes(config: {
     console.log(`[emotes] loaded ${globalData.emotes.length} global emotes`);
   }
 
-  if (config.seventvUserId) {
-    const url = `${SEVENTV_API}/users/${encodeURIComponent(config.seventvUserId)}`;
-    const user = await fetchJson<SevenTVUser>(url);
+  if (twitchUserId) {
+    const url = `${SEVENTV_API}/users/twitch/${twitchUserId}`;
+    const user = await fetchJson<SevenTVTwitchLookupResponse>(url);
 
-    if (user && user.connections) {
-      const conn = user.connections.find((c) => c.platform === "TWITCH");
-
-      if (conn) {
-        if (conn.emote_set?.emotes) {
-          extract7TVEmotes(conn.emote_set.emotes, map);
-          console.log(
-            `[emotes] loaded ${conn.emote_set.emotes.length} channel emotes (embedded)`
-          );
-        } else if (conn.emote_set_id) {
-          const setData = await fetchJson<SevenTVEmoteSet>(
-            `${SEVENTV_API}/emote-sets/${conn.emote_set_id}`
-          );
-          if (setData?.emotes) {
-            extract7TVEmotes(setData.emotes, map);
-            console.log(
-              `[emotes] loaded ${setData.emotes.length} channel emotes (fetched set)`
-            );
-          }
-        }
-      } else {
-        console.warn(
-          `[emotes] user ${config.seventvUserId} has no TWITCH connection`
-        );
-      }
+    if (user && user.emote_set?.emotes) {
+      extract7TVEmotes(user.emote_set.emotes, map);
+      console.log(
+        `[emotes] loaded ${user.emote_set.emotes.length} channel emotes for ${user.username}`
+      );
+    } else {
+      console.warn(`[emotes] no emote set found for twitch ID ${twitchUserId}`);
     }
   }
 

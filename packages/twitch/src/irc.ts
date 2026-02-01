@@ -146,7 +146,7 @@ export function connectTwitchIrc(opts: TwitchIrcOptions): {
       ws?.send(`JOIN #${channel}`);
 
       const authMode = hasAuth ? `authenticated as ${nick}` : "anonymous";
-      log(`twitch irc: connected (${authMode}), joined #${channel}`);
+      log(`[irc] connected (${authMode}), joined #${channel}`);
     });
 
     ws.addEventListener("message", (ev) => {
@@ -222,12 +222,12 @@ export function connectTwitchIrc(opts: TwitchIrcOptions): {
 
     ws.addEventListener("close", () => {
       if (closed) return;
-      log("twitch irc: disconnected, reconnecting…");
+      log("[irc] disconnected, reconnecting…");
       setTimeout(start, 3000);
     });
 
     ws.addEventListener("error", () => {
-      log("twitch irc: error");
+      log("[irc] error");
       ws?.close();
     });
   }

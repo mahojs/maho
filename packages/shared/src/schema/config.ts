@@ -11,9 +11,6 @@ export const AppConfigSchema = z.object({
 
   hasTwitchToken: z.boolean().optional(),
 
-  // integrations
-  seventvUserId: z.string().optional(),
-
   // hard system limit for server memory allocation 
   maxMessages: z.number().int().min(1).max(100).default(50),
 });

@@ -108,3 +108,24 @@ export async function createSubscription(
     return null;
   }
 }
+
+export async function getTwitchUserByName(login: string) {
+  try {
+    const res = await fetch(
+      `https://api.ivr.fi/v2/twitch/user?login=${encodeURIComponent(login)}`
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as any;
+    const user = data[0];
+    if (!user) return null;
+    return {
+      id: user.id,
+      login: user.login,
+      displayName: user.displayName,
+      logo: user.logo,
+    };
+  } catch (e) {
+    console.error(`[twitch] public id lookup failed for ${login}:`, e);
+    return null;
+  }
+}
