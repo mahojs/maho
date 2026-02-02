@@ -10,9 +10,9 @@ export const ThemeStateSchema = z.object({
     showNames: true,
     customCss: "",
     locales: {
-      "alert.follow.title": "New Follower",
-      "alert.sub.title": "New Subscriber",
-      "alert.sub.details": "Tier {tier} • {months} Months",
+      "alert.follow.title": "New follower",
+      "alert.sub.title": "New subscriber",
+      "alert.sub.details": "Tier {tier} • {months} months",
       "chat.moderation.deleted": "Message deleted",
       "chat.moderation.timeout": "{user} was timed out for {duration}s",
       "chat.placeholder.link": "[link]",

@@ -1,5 +1,4 @@
-import type { AppEvent, MessagePart } from "./schema/events";
-import type { RenderAction } from "./schema/rules";
+import type { AppEvent, MessagePart, RenderAction } from "./schema";
 
 export type RenderLayer = {
   id: string;
