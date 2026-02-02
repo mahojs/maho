@@ -14,7 +14,7 @@ import {
   applyThemePackage,
   type State,
 } from "./state";
-import { loadTheme } from "./themes";
+import type { ThemeLoader } from "./themes";
 import type { ServerWebSocket } from "bun";
 
 type WsData = {};
@@ -30,13 +30,13 @@ export type WsHub = {
   onClose: (ws: WS) => void;
 };
 
-// simple equality check
 function equals(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
 export function createWsHub(
   state: State,
+  themes: ThemeLoader,
   supportedProtocol: ProtocolVersion,
   schedulePersist: () => void,
   hooks?: {
@@ -188,21 +188,18 @@ export function createWsHub(
     if (msg.op === "theme:patch") {
       if (!requireControl(ws)) return;
 
-      const requestedFolderId = msg.patch.activeThemeId;
-      const isSwitching =
-        requestedFolderId && requestedFolderId !== state.theme.activeThemeId;
+      const requestedId = msg.patch.activeThemeId;
 
-      if (isSwitching) {
+      if (requestedId) {
         try {
-          const pkg = await loadTheme(requestedFolderId);
-          applyThemePackage(state, pkg, requestedFolderId);
-          msg.patch.values = state.theme.values;
-          console.log(`[themes] switched to folder: ${requestedFolderId}`);
-        } catch (e: any) {
-          send(ws, {
-            op: "error",
-            message: `Theme folder not found: ${requestedFolderId}`,
-          });
+          const pkg = await themes.load(
+            requestedId,
+            state.config.themeDirectory
+          );
+          applyThemePackage(state, pkg, requestedId);
+          // ...
+        } catch (e) {
+          send(ws, { op: "error", message: "theme not found" });
           return;
         }
       } else {

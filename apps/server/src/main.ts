@@ -10,7 +10,7 @@ import {
 import { loadEmotes } from "./emotes";
 import { loadBadges } from "./badges";
 import { appendEvent } from "./commands";
-import { loadTheme } from "./themes";
+import { createThemeLoader } from "./themes";
 import {
   connectTwitchIrc,
   connectEventSub,
@@ -18,6 +18,7 @@ import {
   getTwitchUserByName,
   type TwitchTokenInfo,
 } from "@maho/twitch";
+import { join } from "node:path";
 
 const PORT = 3000;
 const HOST = "127.0.0.1";
@@ -38,16 +39,26 @@ const state = createInitialState({
   theme: persisted.theme,
 });
 
-const activeFolderId = state.theme.activeThemeId || "default";
+const themes = createThemeLoader(
+  join(process.cwd(), "themes"),
+  join(DATA_DIR, "themes")
+);
 
 try {
-  const pkg = await loadTheme(activeFolderId);
-  applyThemePackage(state, pkg, activeFolderId);
-  console.log(`[themes] initialized with folder: ${activeFolderId}`);
+  const targetThemeId = state.theme.activeThemeId || "default";
+  const pkg = await themes.load(targetThemeId, state.config.themeDirectory);
+  applyThemePackage(state, pkg, pkg.id);
+  console.log(`[themes] loaded ${pkg.id}`);
 } catch (e) {
   console.warn(
-    `[themes] folder '${activeFolderId}' not found, using default from config.`
+    `[themes] could not load theme, trying internal default`
   );
+  try {
+    const fallback = await themes.load("default");
+    applyThemePackage(state, fallback, "default");
+  } catch (err) {
+    console.error(`[themes] could not load internal default`);
+  }
 }
 
 const channelUser = await getTwitchUserByName(state.config.channel);
@@ -158,7 +169,7 @@ async function startTwitchServices(cfg: AppConfig) {
 startTwitchServices(state.config);
 
 // ws hub and config hooks
-const hub = createWsHub(state, SUPPORTED_PROTOCOL, scheduleSave, {
+const hub = createWsHub(state, themes, SUPPORTED_PROTOCOL, scheduleSave, {
   async onConfigChanged(next, prev) {
     if (next.channel !== prev.channel) {
       const user = await getTwitchUserByName(next.channel);
